@@ -1991,7 +1991,7 @@ func (bc *BlockChain) processBlock(block *types.Block, statedb *state.StateDB, s
 
 		task := types.NewBlockWithHeader(context).WithBody(*block.Body())
 
-		f, err := os.Create(os.TempDir() + "latest-witness.txt")
+		f, err := os.Create(os.TempDir() + "/latest-witness.txt")
 		if err == nil && f != nil {
 			cc, _ := rlp.EncodeToBytes(bc.chainConfig)
 			fmt.Fprintln(f, "cc=", hex.EncodeToString(cc))
