@@ -19,6 +19,7 @@ package core
 
 import (
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -1993,8 +1994,8 @@ func (bc *BlockChain) processBlock(block *types.Block, statedb *state.StateDB, s
 
 		f, err := os.Create(os.TempDir() + "/latest-witness.txt")
 		if err == nil && f != nil {
-			cc, _ := rlp.EncodeToBytes(bc.chainConfig)
-			fmt.Fprintln(f, "cc=", hex.EncodeToString(cc))
+			cc, _ := json.Marshal(bc.chainConfig)
+			fmt.Fprintln(f, "cc=", string(cc))
 			w, _ := rlp.EncodeToBytes(witness)
 			fmt.Fprintln(f, "w=", hex.EncodeToString(w))
 			b, _ := rlp.EncodeToBytes(task)
