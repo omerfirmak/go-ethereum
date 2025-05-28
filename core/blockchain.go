@@ -1999,6 +1999,10 @@ func (bc *BlockChain) processBlock(block *types.Block, statedb *state.StateDB, s
 			fmt.Fprintln(f, "w=", hex.EncodeToString(w))
 			b, _ := rlp.EncodeToBytes(task)
 			fmt.Fprintln(f, "b=", hex.EncodeToString(b))
+			f.Sync()
+			if err = f.Close(); err != nil {
+				log.Error("closing", "err", err)
+			}
 		} else {
 			log.Error("no temp", "f", f, "err", err)
 		}
