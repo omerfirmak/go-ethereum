@@ -1837,6 +1837,7 @@ func (bc *BlockChain) insertChain(chain types.Blocks, setHead bool, makeWitness 
 			return nil, it.index, err
 		}
 
+		log.Warn("bc.vmConfig.StatelessSelfValidation", "config", bc.vmConfig.StatelessSelfValidation)
 		// If we are past Byzantium, enable prefetching to pull in trie node paths
 		// while processing transactions. Before Byzantium the prefetcher is mostly
 		// useless due to the intermediate root hashing after each transaction.
