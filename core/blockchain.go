@@ -24,6 +24,7 @@ import (
 	"io"
 	"math"
 	"math/big"
+	"os"
 	"runtime"
 	"slices"
 	"sort"
@@ -1990,12 +1991,17 @@ func (bc *BlockChain) processBlock(block *types.Block, statedb *state.StateDB, s
 
 		task := types.NewBlockWithHeader(context).WithBody(*block.Body())
 
-		cc, _ := rlp.EncodeToBytes(bc.chainConfig)
-		fmt.Println("cc ", hex.EncodeToString(cc))
-		w, _ := rlp.EncodeToBytes(witness)
-		fmt.Println("w ", hex.EncodeToString(w))
-		b, _ := rlp.EncodeToBytes(task)
-		fmt.Println("b ", hex.EncodeToString(b))
+		f, err := os.Create(os.TempDir() + "latest-witness.txt")
+		if err == nil && f != nil {
+			cc, _ := rlp.EncodeToBytes(bc.chainConfig)
+			fmt.Fprintln(f, "cc=", hex.EncodeToString(cc))
+			w, _ := rlp.EncodeToBytes(witness)
+			fmt.Fprintln(f, "w=", hex.EncodeToString(w))
+			b, _ := rlp.EncodeToBytes(task)
+			fmt.Fprintln(f, "b=", hex.EncodeToString(b))
+		} else {
+			log.Error("no temp", "f", f, "err", err)
+		}
 
 		// Run the stateless self-cross-validation
 		crossStateRoot, crossReceiptRoot, err := ExecuteStateless(bc.chainConfig, bc.vmConfig, task, witness)
