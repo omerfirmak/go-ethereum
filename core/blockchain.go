@@ -18,6 +18,7 @@
 package core
 
 import (
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
@@ -1987,6 +1988,13 @@ func (bc *BlockChain) processBlock(block *types.Block, statedb *state.StateDB, s
 		context.ReceiptHash = common.Hash{}
 
 		task := types.NewBlockWithHeader(context).WithBody(*block.Body())
+
+		cc, _ := rlp.EncodeToBytes(bc.chainConfig)
+		fmt.Println("cc ", hex.EncodeToString(cc))
+		w, _ := rlp.EncodeToBytes(witness)
+		fmt.Println("w ", hex.EncodeToString(w))
+		b, _ := rlp.EncodeToBytes(task)
+		fmt.Println("b ", hex.EncodeToString(b))
 
 		// Run the stateless self-cross-validation
 		crossStateRoot, crossReceiptRoot, err := ExecuteStateless(bc.chainConfig, bc.vmConfig, task, witness)
