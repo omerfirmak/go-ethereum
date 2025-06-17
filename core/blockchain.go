@@ -146,7 +146,11 @@ const (
 	//  The following incompatible database changes were added:
 	//  * Total difficulty has been removed from both the key-value store and the ancient store.
 	//  * The metadata structure of freezer is changed by adding 'flushOffset'
-	BlockChainVersion uint64 = 9
+	//
+	// - Version 10
+	//  The following incompatible database changes were added:
+	//    * todo(omer)
+	BlockChainVersion uint64 = 10
 )
 
 // BlockChainConfig contains the configuration of the BlockChain object.
@@ -1191,7 +1195,6 @@ func (bc *BlockChain) writeHeadBlock(block *types.Block) {
 	rawdb.WriteHeadHeaderHash(batch, block.Hash())
 	rawdb.WriteHeadFastBlockHash(batch, block.Hash())
 	rawdb.WriteCanonicalHash(batch, block.Hash(), block.NumberU64())
-	rawdb.WriteTxLookupEntriesByBlock(batch, block)
 	rawdb.WriteHeadBlockHash(batch, block.Hash())
 
 	// Flush the whole batch into the disk, exit the node if failed
