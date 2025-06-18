@@ -1373,6 +1373,7 @@ func (api *TransactionAPI) GetRawTransactionByHash(ctx context.Context, hash com
 
 // GetTransactionReceipt returns the transaction receipt for the given transaction hash.
 func (api *TransactionAPI) GetTransactionReceipt(ctx context.Context, hash common.Hash) (map[string]interface{}, error) {
+	start := time.Now()
 	found, tx, blockHash, blockNumber, index := api.b.GetCanonicalTransaction(hash)
 	if !found {
 		// Make sure indexer is done.
@@ -1382,12 +1383,19 @@ func (api *TransactionAPI) GetTransactionReceipt(ctx context.Context, hash commo
 		// No such tx.
 		return nil, nil
 	}
+	txRead := time.Now()
 	receipt, err := api.b.GetCanonicalReceipt(tx, blockHash, blockNumber, index)
 	if err != nil {
 		return nil, err
 	}
+	receiptRead := time.Now()
 	// Derive the sender.
-	return marshalReceipt(receipt, blockHash, blockNumber, api.signer, tx, int(index)), nil
+	res := marshalReceipt(receipt, blockHash, blockNumber, api.signer, tx, int(index))
+	done := time.Now()
+
+	log.Info("GetTransactionReceipt", "GetTransaction", txRead.Sub(start),
+		"GetReceiptByIndex", receiptRead.Sub(txRead), "Marshal", done.Sub(receiptRead))
+	return res, nil
 }
 
 // marshalReceipt marshals a transaction receipt into a JSON object.

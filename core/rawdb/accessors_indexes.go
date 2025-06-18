@@ -22,6 +22,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -174,24 +175,32 @@ func findTxInBlockBody(blockbody rlp.RawValue, target common.Hash) (*types.Trans
 // with its added positional metadata. Notably, only the transaction in the canonical
 // chain is visible.
 func ReadCanonicalTransaction(db ethdb.Reader, hash common.Hash) (*types.Transaction, common.Hash, uint64, uint64) {
+	start := time.Now()
 	blockNumber := ReadTxLookupEntry(db, hash)
 	if blockNumber == nil {
 		return nil, common.Hash{}, 0, 0
 	}
+	lookedUp := time.Now()
 	blockHash := ReadCanonicalHash(db, *blockNumber)
 	if blockHash == (common.Hash{}) {
 		return nil, common.Hash{}, 0, 0
 	}
+	readCanonicalHash := time.Now()
 	bodyRLP := ReadCanonicalBodyRLP(db, *blockNumber, &blockHash)
 	if bodyRLP == nil {
 		log.Error("Transaction referenced missing", "number", *blockNumber, "hash", blockHash)
 		return nil, common.Hash{}, 0, 0
 	}
+	bodyRead := time.Now()
 	tx, txIndex, err := findTxInBlockBody(bodyRLP, hash)
 	if err != nil {
 		log.Error("Transaction not found", "number", *blockNumber, "hash", blockHash, "txhash", hash, "err", err)
 		return nil, common.Hash{}, 0, 0
 	}
+	parseBody := time.Now()
+
+	log.Info("ReadTransaction", "ReadTxLookupEntry", lookedUp.Sub(start), "ReadCanonicalHash", readCanonicalHash.Sub(lookedUp),
+		"ReadBodyRLP", bodyRead.Sub(readCanonicalHash), "findTxInBlockBody", parseBody.Sub(bodyRead))
 	return tx, blockHash, *blockNumber, txIndex
 }
 
@@ -269,10 +278,12 @@ type RawReceiptContext struct {
 // that the additional positional fields are not directly included in the receipt.
 // Notably, only receipts from the canonical chain are visible.
 func ReadCanonicalRawReceipt(db ethdb.Reader, blockHash common.Hash, blockNumber, txIndex uint64) (*types.Receipt, RawReceiptContext, error) {
+	start := time.Now()
 	receiptIt, err := rlp.NewListIterator(ReadCanonicalReceiptsRLP(db, blockNumber, &blockHash))
 	if err != nil {
 		return nil, RawReceiptContext{}, err
 	}
+	receiptsRead := time.Now()
 	var (
 		cumulativeGasUsed uint64
 		logIndex          uint
@@ -287,10 +298,16 @@ func ReadCanonicalRawReceipt(db ethdb.Reader, blockHash common.Hash, blockNumber
 			return nil, RawReceiptContext{}, fmt.Errorf("receipt not found, %d, %x, %d", blockNumber, blockHash, txIndex)
 		}
 		if i == txIndex {
+			receiptFound := time.Now()
 			var stored types.ReceiptForStorage
 			if err := rlp.DecodeBytes(receiptIt.Value(), &stored); err != nil {
 				return nil, RawReceiptContext{}, err
 			}
+			done := time.Now()
+
+			log.Info("ReadRawReceipt", "ReadReceiptsRLP", receiptsRead.Sub(start), "Walked", receiptsRead.Sub(receiptFound),
+				"Parsed", done.Sub(receiptFound))
+
 			return (*types.Receipt)(&stored), RawReceiptContext{
 				GasUsed:  stored.CumulativeGasUsed - cumulativeGasUsed,
 				LogIndex: logIndex,
