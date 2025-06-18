@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/consensus"
@@ -30,6 +31,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/event"
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/ethereum/go-ethereum/triedb"
@@ -225,6 +227,7 @@ func (bc *BlockChain) GetReceiptByIndex(tx *types.Transaction, blockHash common.
 		}
 		return receipts[int(txIndex)], nil
 	}
+	start := time.Now()
 	header := bc.GetHeader(blockHash, blockNumber)
 	if header == nil {
 		return nil, fmt.Errorf("block header is not found, %d, %x", blockNumber, blockHash)
@@ -233,10 +236,15 @@ func (bc *BlockChain) GetReceiptByIndex(tx *types.Transaction, blockHash common.
 	if header.ExcessBlobGas != nil {
 		blobGasPrice = eip4844.CalcBlobFee(bc.chainConfig, header)
 	}
+	headerDone := time.Now()
+
 	receipt, ctx, err := rawdb.ReadRawReceipt(bc.db, blockHash, blockNumber, txIndex)
 	if err != nil {
 		return nil, err
 	}
+
+	receiptRead := time.Now()
+
 	signer := types.MakeSigner(bc.chainConfig, new(big.Int).SetUint64(blockNumber), header.Time)
 	receipt.DeriveFields(signer, types.DeriveReceiptContext{
 		BlockHash:    blockHash,
@@ -249,6 +257,11 @@ func (bc *BlockChain) GetReceiptByIndex(tx *types.Transaction, blockHash common.
 		Tx:           tx,
 		TxIndex:      uint(txIndex),
 	})
+
+	deriveDone := time.Now()
+
+	log.Info("GetReceiptByIndex", "GetHeader", headerDone.Sub(start), "ReadRawReceipt", receiptRead.Sub(headerDone),
+		"DeriveFields", deriveDone.Sub(receiptRead))
 	return receipt, nil
 }
 

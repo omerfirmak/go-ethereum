@@ -1373,6 +1373,7 @@ func (api *TransactionAPI) GetRawTransactionByHash(ctx context.Context, hash com
 
 // GetTransactionReceipt returns the transaction receipt for the given transaction hash.
 func (api *TransactionAPI) GetTransactionReceipt(ctx context.Context, hash common.Hash) (map[string]interface{}, error) {
+	start := time.Now()
 	found, tx, blockHash, blockNumber, index := api.b.GetTransaction(hash)
 	if !found {
 		// Make sure indexer is done.
@@ -1382,17 +1383,25 @@ func (api *TransactionAPI) GetTransactionReceipt(ctx context.Context, hash commo
 		// No such tx.
 		return nil, nil
 	}
+	txRead := time.Now()
 	header, err := api.b.HeaderByHash(ctx, blockHash)
 	if err != nil {
 		return nil, err
 	}
+	headerRead := time.Now()
 	receipt, err := api.b.GetReceiptByIndex(tx, blockHash, blockNumber, index)
 	if err != nil {
 		return nil, err
 	}
+	receiptRead := time.Now()
 	// Derive the sender.
 	signer := types.MakeSigner(api.b.ChainConfig(), header.Number, header.Time)
-	return marshalReceipt(receipt, blockHash, blockNumber, signer, tx, int(index)), nil
+	res := marshalReceipt(receipt, blockHash, blockNumber, signer, tx, int(index))
+	done := time.Now()
+
+	log.Info("GetTransactionReceipt", "GetTransaction", txRead.Sub(start), "HeaderByHash", headerRead.Sub(txRead),
+		"GetReceiptByIndex", receiptRead.Sub(headerRead), "Marshal", done.Sub(receiptRead))
+	return res, nil
 }
 
 // marshalReceipt marshals a transaction receipt into a JSON object.
