@@ -535,6 +535,7 @@ func (indexer *txIndexer) index(from uint64, to uint64, interrupt chan struct{},
 			// Next block available, pop it off and index it
 			delivery := queue.PopItem()
 			lastNum = delivery.number
+			log.Info("writing ", lastNum)
 			rawdb.WriteTxLookupEntries(batch, delivery.txHashes, delivery.indexes)
 			blocks++
 			txs += len(delivery.txHashes)
