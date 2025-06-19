@@ -146,6 +146,7 @@ func (indexer *txIndexer) run(head uint64, stop chan struct{}, done chan struct{
 	// limit and the latest chain head.
 	from := head - indexer.limit + 1
 	from = max(from, indexer.cutoff)
+	log.Info("run", "from", from, "tail", *tail)
 	if from < *tail {
 		// Reindex a part of missing indices and rewind index tail to HEAD-limit
 		indexer.index(from, *tail, stop, nil, true)
