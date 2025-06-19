@@ -38,6 +38,8 @@ func DecodeTxLookupEntry(data []byte, db ethdb.Reader) *uint64 {
 	var index TxIndex
 	if err := rlp.DecodeBytes(data, &index); err == nil {
 		return &index.BlockNumber
+	} else {
+		log.Error("DecodeTxLookupEntry", "err", err)
 	}
 	// Database v6 tx lookup just stores the block number
 	if len(data) < common.HashLength {
@@ -202,11 +204,13 @@ func ReadTransaction(db ethdb.Reader, hash common.Hash) (*types.Transaction, com
 	start := time.Now()
 	blockNumber := ReadTxLookupEntry(db, hash)
 	if blockNumber == nil {
+		log.Error("ReadTxLookupEntry not found")
 		return nil, common.Hash{}, 0, 0
 	}
 	lookedUp := time.Now()
 	blockHash := ReadCanonicalHash(db, *blockNumber)
 	if blockHash == (common.Hash{}) {
+		log.Error("Canonical hash not found", "number", *blockNumber, "hash", blockHash, "txhash", hash)
 		return nil, common.Hash{}, 0, 0
 	}
 	readCanonicalHash := time.Now()
