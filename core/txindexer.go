@@ -253,7 +253,11 @@ func (indexer *txIndexer) loop(chain *BlockChain) {
 	// Launch the initial processing if chain is not empty (head != genesis).
 	// This step is useful in these scenarios that chain has no progress.
 	if head != 0 {
-		log.Info("initial processing")
+		var tail uint64
+		if p := indexer.tail.Load(); p != nil {
+			tail = *p
+		}
+		log.Info("initial processing", "head", head, "co", indexer.cutoff, "tail", tail, "cutoff", indexer.cutoff, "limit", indexer.limit)
 		stop = make(chan struct{})
 		done = make(chan struct{})
 		go indexer.run(head, stop, done)
@@ -261,7 +265,7 @@ func (indexer *txIndexer) loop(chain *BlockChain) {
 	for {
 		select {
 		case h := <-headCh:
-			log.Info("New head", h.Header.Number, "done", done == nil)
+			log.Info("New head", "num", h.Header.Number, "done", done == nil)
 			indexer.head.Store(h.Header.Number.Uint64())
 			if done == nil {
 				stop = make(chan struct{})
