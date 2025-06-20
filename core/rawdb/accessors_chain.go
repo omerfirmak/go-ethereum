@@ -446,6 +446,7 @@ func ReadBodyRLP(db ethdb.Reader, hash common.Hash, number uint64) rlp.RawValue 
 		data, _ = db.Get(blockBodyKey(number, hash))
 		return nil
 	})
+	log.Info("ReadBodyRLP", "hash", hash, "number", number)
 	return data
 }
 
