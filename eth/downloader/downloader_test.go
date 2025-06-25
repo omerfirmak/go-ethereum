@@ -55,7 +55,7 @@ func newTester(t *testing.T) *downloadTester {
 
 // newTesterWithNotification creates a new downloader test mocker.
 func newTesterWithNotification(t *testing.T, success func()) *downloadTester {
-	db, err := rawdb.Open(rawdb.NewMemoryDatabase(), rawdb.OpenOptions{})
+	db, err := rawdb.Open(rawdb.NewMemoryDatabase(), rawdb.NewMemoryDatabase(), rawdb.OpenOptions{})
 	if err != nil {
 		panic(err)
 	}

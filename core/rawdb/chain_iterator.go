@@ -186,7 +186,7 @@ func indexTransactions(db ethdb.Database, from uint64, to uint64, interrupt chan
 	}
 	var (
 		hashesCh = iterateTransactions(db, from, to, true, interrupt)
-		batch    = db.NewBatch()
+		batch    = db.IndexStore().NewBatch()
 		start    = time.Now()
 		logged   = start.Add(-7 * time.Second)
 
@@ -282,7 +282,7 @@ func unindexTransactions(db ethdb.Database, from uint64, to uint64, interrupt ch
 	}
 	var (
 		hashesCh = iterateTransactions(db, from, to, false, interrupt)
-		batch    = db.NewBatch()
+		batch    = db.IndexStore().NewBatch()
 		start    = time.Now()
 		logged   = start.Add(-7 * time.Second)
 
@@ -365,7 +365,7 @@ func unindexTransactionsForTesting(db ethdb.Database, from uint64, to uint64, in
 
 // PruneTransactionIndex removes all tx index entries below a certain block number.
 func PruneTransactionIndex(db ethdb.Database, pruneBlock uint64) {
-	tail := ReadTxIndexTail(db)
+	tail := ReadTxIndexTail(db.IndexStore())
 	if tail == nil || *tail > pruneBlock {
 		return // no index, or index ends above pruneBlock
 	}
@@ -373,7 +373,7 @@ func PruneTransactionIndex(db ethdb.Database, pruneBlock uint64) {
 	// their entries. Note if this fails, the index is messed up, but tail still points to
 	// the old tail.
 	var count, removed int
-	DeleteAllTxLookupEntries(db, func(txhash common.Hash, v []byte) bool {
+	DeleteAllTxLookupEntries(db.IndexStore(), func(txhash common.Hash, v []byte) bool {
 		count++
 		if count%10000000 == 0 {
 			log.Info("Pruning tx index", "count", count, "removed", removed)

@@ -123,7 +123,7 @@ type tester struct {
 
 func newTester(t *testing.T, historyLimit uint64, isVerkle bool, layers int, enableIndex bool) *tester {
 	var (
-		disk, _ = rawdb.Open(rawdb.NewMemoryDatabase(), rawdb.OpenOptions{Ancient: t.TempDir()})
+		disk, _ = rawdb.Open(rawdb.NewMemoryDatabase(), rawdb.NewMemoryDatabase(), rawdb.OpenOptions{Ancient: t.TempDir()})
 		db      = New(disk, &Config{
 			StateHistory:        historyLimit,
 			EnableStateIndexing: enableIndex,

@@ -27,6 +27,7 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/params"
+	"github.com/stretchr/testify/require"
 )
 
 func verifyIndexes(t *testing.T, db ethdb.Database, block *types.Block, exist bool) {
@@ -42,7 +43,7 @@ func verifyIndexes(t *testing.T, db ethdb.Database, block *types.Block, exist bo
 }
 
 func verify(t *testing.T, db ethdb.Database, blocks []*types.Block, expTail uint64) {
-	tail := rawdb.ReadTxIndexTail(db)
+	tail := rawdb.ReadTxIndexTail(db.IndexStore())
 	if tail == nil {
 		t.Fatal("Failed to write tx index tail")
 		return
@@ -67,6 +68,19 @@ func verifyNoIndex(t *testing.T, db ethdb.Database, blocks []*types.Block) {
 	for _, b := range blocks {
 		verifyIndexes(t, db, b, false)
 	}
+}
+
+func verifyMigration(t *testing.T, db ethdb.Database, blocks []*types.Block, expTail uint64) {
+	store := rawdb.NewMemoryDatabase()
+	emptyStoreDb, err := rawdb.Open(db, store, rawdb.OpenOptions{})
+	require.NoError(t, err)
+	(&txIndexer{
+		limit: 0,
+		db:    emptyStoreDb,
+		store: emptyStoreDb.IndexStore(),
+	}).migrateToStore()
+	verify(t, emptyStoreDb, blocks, expTail)
+	verifyNoIndex(t, db, blocks)
 }
 
 // TestTxIndexer tests the functionalities for managing transaction indexes.
@@ -116,19 +130,22 @@ func TestTxIndexer(t *testing.T) {
 		},
 	}
 	for _, c := range cases {
-		db, _ := rawdb.Open(rawdb.NewMemoryDatabase(), rawdb.OpenOptions{})
+		store := rawdb.NewMemoryDatabase()
+		db, _ := rawdb.Open(store, store, rawdb.OpenOptions{})
 		rawdb.WriteAncientBlocks(db, append([]*types.Block{gspec.ToBlock()}, blocks...), types.EncodeBlockReceiptLists(append([]types.Receipts{{}}, receipts...)))
 
 		// Index the initial blocks from ancient store
 		indexer := &txIndexer{
 			limit: 0,
 			db:    db,
+			store: store,
 		}
 		for i, limit := range c.limits {
 			indexer.limit = limit
 			indexer.run(chainHead, make(chan struct{}), make(chan struct{}))
 			verify(t, db, blocks, c.tails[i])
 		}
+		verifyMigration(t, db, blocks, c.tails[len(c.limits)-1])
 		db.Close()
 	}
 }
@@ -235,7 +252,7 @@ func TestTxIndexerRepair(t *testing.T) {
 		},
 	}
 	for _, c := range cases {
-		db, _ := rawdb.Open(rawdb.NewMemoryDatabase(), rawdb.OpenOptions{})
+		db, _ := rawdb.Open(rawdb.NewMemoryDatabase(), rawdb.NewMemoryDatabase(), rawdb.OpenOptions{})
 		encReceipts := types.EncodeBlockReceiptLists(append([]types.Receipts{{}}, receipts...))
 		rawdb.WriteAncientBlocks(db, append([]*types.Block{gspec.ToBlock()}, blocks...), encReceipts)
 
@@ -426,7 +443,7 @@ func TestTxIndexerReport(t *testing.T) {
 		},
 	}
 	for _, c := range cases {
-		db, _ := rawdb.Open(rawdb.NewMemoryDatabase(), rawdb.OpenOptions{})
+		db, _ := rawdb.Open(rawdb.NewMemoryDatabase(), rawdb.NewMemoryDatabase(), rawdb.OpenOptions{})
 		encReceipts := types.EncodeBlockReceiptLists(append([]types.Receipts{{}}, receipts...))
 		rawdb.WriteAncientBlocks(db, append([]*types.Block{gspec.ToBlock()}, blocks...), encReceipts)
 

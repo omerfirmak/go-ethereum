@@ -140,6 +140,14 @@ func (db *Database) Close() error {
 	return nil
 }
 
+func (db *Database) IndexStore() ethdb.KeyValueStore {
+	panic("not supported")
+}
+
+func (db *Database) IndexReader() ethdb.KeyValueReader {
+	panic("not supported")
+}
+
 func New(client *rpc.Client) ethdb.Database {
 	if client == nil {
 		return nil

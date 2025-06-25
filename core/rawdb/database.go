@@ -41,9 +41,20 @@ var ErrDeleteRangeInterrupted = errors.New("safe delete range operation interrup
 type freezerdb struct {
 	ethdb.KeyValueStore
 	*chainFreezer
+	indexStore ethdb.KeyValueStore
 
 	readOnly    bool
 	ancientRoot string
+}
+
+// IndexReader
+func (frdb *freezerdb) IndexReader() ethdb.KeyValueReader {
+	return frdb.indexStore
+}
+
+// IndexStore
+func (frdb *freezerdb) IndexStore() ethdb.KeyValueStore {
+	return frdb.indexStore
 }
 
 // AncientDatadir returns the path of root ancient directory.
@@ -84,6 +95,16 @@ func (frdb *freezerdb) Freeze() error {
 // nofreezedb is a database wrapper that disables freezer data retrievals.
 type nofreezedb struct {
 	ethdb.KeyValueStore
+}
+
+// IndexReader
+func (db *nofreezedb) IndexReader() ethdb.KeyValueReader {
+	return nil
+}
+
+// IndexStore
+func (db *nofreezedb) IndexStore() ethdb.KeyValueStore {
+	return nil
 }
 
 // Ancient returns an error as we don't have a backing chain freezer.
@@ -193,19 +214,6 @@ func resolveChainEraDir(chainFreezerDir string, era string) string {
 	}
 }
 
-// NewDatabaseWithFreezer creates a high level database on top of a given key-value store.
-// The passed ancient indicates the path of root ancient directory where the chain freezer
-// can be opened.
-//
-// Deprecated: use Open.
-func NewDatabaseWithFreezer(db ethdb.KeyValueStore, ancient string, namespace string, readonly bool) (ethdb.Database, error) {
-	return Open(db, OpenOptions{
-		Ancient:          ancient,
-		MetricsNamespace: namespace,
-		ReadOnly:         readonly,
-	})
-}
-
 // OpenOptions specifies options for opening the database.
 type OpenOptions struct {
 	Ancient          string // ancients directory
@@ -215,7 +223,7 @@ type OpenOptions struct {
 }
 
 // Open creates a high-level database wrapper for the given key-value store.
-func Open(db ethdb.KeyValueStore, opts OpenOptions) (ethdb.Database, error) {
+func Open(db ethdb.KeyValueStore, indexStore ethdb.KeyValueStore, opts OpenOptions) (ethdb.Database, error) {
 	// Create the idle freezer instance. If the given ancient directory is empty,
 	// in-memory chain freezer is used (e.g. dev mode); otherwise the regular
 	// file-based freezer is created.
@@ -317,6 +325,7 @@ func Open(db ethdb.KeyValueStore, opts OpenOptions) (ethdb.Database, error) {
 	return &freezerdb{
 		ancientRoot:   opts.Ancient,
 		KeyValueStore: db,
+		indexStore:    indexStore,
 		chainFreezer:  frdb,
 	}, nil
 }

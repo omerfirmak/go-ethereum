@@ -69,7 +69,11 @@ func (basic *snapshotTestBasic) prepare(t *testing.T) (*BlockChain, []*types.Blo
 	if err != nil {
 		t.Fatalf("Failed to create persistent key-value database: %v", err)
 	}
-	db, err := rawdb.Open(pdb, rawdb.OpenOptions{Ancient: ancient})
+	indexStore, err := pebble.New(filepath.Join(datadir, "indexstore"), 0, 0, "", false)
+	if err != nil {
+		t.Fatalf("Failed to create persistent key-value database: %v", err)
+	}
+	db, err := rawdb.Open(pdb, indexStore, rawdb.OpenOptions{Ancient: ancient})
 	if err != nil {
 		t.Fatalf("Failed to create persistent freezer database: %v", err)
 	}
@@ -264,7 +268,11 @@ func (snaptest *crashSnapshotTest) test(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create persistent key-value database: %v", err)
 	}
-	newdb, err := rawdb.Open(pdb, rawdb.OpenOptions{Ancient: snaptest.ancient})
+	indexStore, err := pebble.New(filepath.Join(snaptest.datadir, "indexstore"), 0, 0, "", false)
+	if err != nil {
+		t.Fatalf("Failed to create persistent key-value database: %v", err)
+	}
+	newdb, err := rawdb.Open(pdb, indexStore, rawdb.OpenOptions{Ancient: snaptest.ancient})
 	if err != nil {
 		t.Fatalf("Failed to create persistent freezer database: %v", err)
 	}

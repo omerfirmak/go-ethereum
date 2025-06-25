@@ -708,7 +708,7 @@ func (n *Node) OpenDatabaseWithOptions(name string, opt DatabaseOptions) (ethdb.
 	var db ethdb.Database
 	var err error
 	if n.config.DataDir == "" {
-		db, _ = rawdb.Open(memorydb.New(), rawdb.OpenOptions{
+		db, _ = rawdb.Open(memorydb.New(), memorydb.New(), rawdb.OpenOptions{
 			MetricsNamespace: opt.MetricsNamespace,
 			ReadOnly:         opt.ReadOnly,
 		})
