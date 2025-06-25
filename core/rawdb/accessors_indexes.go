@@ -56,16 +56,16 @@ func DecodeTxLookupEntry(data []byte, db ethdb.Reader) *uint64 {
 // ReadTxLookupEntry retrieves the positional metadata associated with a transaction
 // hash to allow retrieving the transaction or receipt by hash.
 func ReadTxLookupEntry(db ethdb.Reader, hash common.Hash) *uint64 {
-	data, _ := db.Get(txLookupKey(hash))
+	data, _ := db.IndexReader().Get(txLookupKey(hash))
 	if len(data) == 0 {
 		return nil
 	}
 	return DecodeTxLookupEntry(data, db)
 }
 
-// writeTxLookupEntry stores a positional metadata for a transaction,
+// WriteTxLookupEntry stores a positional metadata for a transaction,
 // enabling hash based transaction and receipt lookups.
-func writeTxLookupEntry(db ethdb.KeyValueWriter, hash common.Hash, numberBytes []byte) {
+func WriteTxLookupEntry(db ethdb.KeyValueWriter, hash common.Hash, numberBytes []byte) {
 	if err := db.Put(txLookupKey(hash), numberBytes); err != nil {
 		log.Crit("Failed to store transaction lookup entry", "err", err)
 	}
@@ -76,7 +76,7 @@ func writeTxLookupEntry(db ethdb.KeyValueWriter, hash common.Hash, numberBytes [
 func WriteTxLookupEntries(db ethdb.KeyValueWriter, number uint64, hashes []common.Hash) {
 	numberBytes := new(big.Int).SetUint64(number).Bytes()
 	for _, hash := range hashes {
-		writeTxLookupEntry(db, hash, numberBytes)
+		WriteTxLookupEntry(db, hash, numberBytes)
 	}
 }
 
@@ -85,7 +85,7 @@ func WriteTxLookupEntries(db ethdb.KeyValueWriter, number uint64, hashes []commo
 func WriteTxLookupEntriesByBlock(db ethdb.KeyValueWriter, block *types.Block) {
 	numberBytes := block.Number().Bytes()
 	for _, tx := range block.Transactions() {
-		writeTxLookupEntry(db, tx.Hash(), numberBytes)
+		WriteTxLookupEntry(db, tx.Hash(), numberBytes)
 	}
 }
 

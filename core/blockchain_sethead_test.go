@@ -1972,7 +1972,11 @@ func testSetHeadWithScheme(t *testing.T, tt *rewindTest, snapshots bool, scheme 
 	if err != nil {
 		t.Fatalf("Failed to create persistent key-value database: %v", err)
 	}
-	db, err := rawdb.Open(pdb, rawdb.OpenOptions{Ancient: ancient})
+	indexStore, err := pebble.New(filepath.Join(datadir, "indexstore"), 0, 0, "", false)
+	if err != nil {
+		t.Fatalf("Failed to create persistent key-value database: %v", err)
+	}
+	db, err := rawdb.Open(pdb, indexStore, rawdb.OpenOptions{Ancient: ancient})
 	if err != nil {
 		t.Fatalf("Failed to create persistent freezer database: %v", err)
 	}

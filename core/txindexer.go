@@ -19,6 +19,7 @@ package core
 import (
 	"fmt"
 	"sync/atomic"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/rawdb"
@@ -62,6 +63,7 @@ type txIndexer struct {
 	// be pruned and not available locally.
 	cutoff uint64
 	db     ethdb.Database
+	store  ethdb.KeyValueStore
 	term   chan chan struct{}
 	closed chan struct{}
 }
@@ -73,6 +75,7 @@ func newTxIndexer(limit uint64, chain *BlockChain) *txIndexer {
 		limit:  limit,
 		cutoff: cutoff,
 		db:     chain.db,
+		store:  chain.db.IndexStore(),
 		term:   make(chan chan struct{}),
 		closed: make(chan struct{}),
 	}
@@ -113,7 +116,7 @@ func (indexer *txIndexer) run(head uint64, stop chan struct{}, done chan struct{
 	// The tail flag is not existent, it means the node is just initialized
 	// and all blocks in the chain (part of them may from ancient store) are
 	// not indexed yet, index the chain according to the configured limit.
-	tail := rawdb.ReadTxIndexTail(indexer.db)
+	tail := rawdb.ReadTxIndexTail(indexer.store)
 	if tail == nil {
 		// Determine the first block for transaction indexing, taking the
 		// configured cutoff point into account.
@@ -154,7 +157,7 @@ func (indexer *txIndexer) run(head uint64, stop chan struct{}, done chan struct{
 // * The index tail is below the configured cutoff, but it is not empty.
 func (indexer *txIndexer) repair(head uint64) {
 	// If the transactions haven't been indexed yet, nothing to repair
-	tail := rawdb.ReadTxIndexTail(indexer.db)
+	tail := rawdb.ReadTxIndexTail(indexer.store)
 	if tail == nil {
 		return
 	}
@@ -167,8 +170,8 @@ func (indexer *txIndexer) repair(head uint64) {
 		// potentially leaving dangling indexes in the database.
 		// However, this is considered acceptable.
 		indexer.tail.Store(nil)
-		rawdb.DeleteTxIndexTail(indexer.db)
-		rawdb.DeleteAllTxLookupEntries(indexer.db, nil)
+		rawdb.DeleteTxIndexTail(indexer.store)
+		rawdb.DeleteAllTxLookupEntries(indexer.store, nil)
 		log.Warn("Purge transaction indexes", "head", head, "tail", *tail)
 		return
 	}
@@ -188,8 +191,8 @@ func (indexer *txIndexer) repair(head uint64) {
 		// index namespace might be slow and expensive, but we
 		// have no choice.
 		indexer.tail.Store(nil)
-		rawdb.DeleteTxIndexTail(indexer.db)
-		rawdb.DeleteAllTxLookupEntries(indexer.db, nil)
+		rawdb.DeleteTxIndexTail(indexer.store)
+		rawdb.DeleteAllTxLookupEntries(indexer.store, nil)
 		log.Warn("Purge transaction indexes", "head", head, "cutoff", indexer.cutoff)
 		return
 	}
@@ -202,8 +205,8 @@ func (indexer *txIndexer) repair(head uint64) {
 		// potentially leaving dangling indexes in the database.
 		// However, this is considered acceptable.
 		indexer.tail.Store(&indexer.cutoff)
-		rawdb.WriteTxIndexTail(indexer.db, indexer.cutoff)
-		rawdb.DeleteAllTxLookupEntries(indexer.db, func(txhash common.Hash, blob []byte) bool {
+		rawdb.WriteTxIndexTail(indexer.store, indexer.cutoff)
+		rawdb.DeleteAllTxLookupEntries(indexer.store, func(txhash common.Hash, blob []byte) bool {
 			n := rawdb.DecodeTxLookupEntry(blob, indexer.db)
 			return n != nil && *n < indexer.cutoff
 		})
@@ -247,7 +250,10 @@ func (indexer *txIndexer) loop(chain *BlockChain) {
 	if head != 0 {
 		stop = make(chan struct{})
 		done = make(chan struct{})
-		go indexer.run(head, stop, done)
+		go func() {
+			indexer.migrateToStore()
+			indexer.run(head, stop, done)
+		}()
 	}
 	for {
 		select {
@@ -262,7 +268,7 @@ func (indexer *txIndexer) loop(chain *BlockChain) {
 		case <-done:
 			stop = nil
 			done = nil
-			indexer.tail.Store(rawdb.ReadTxIndexTail(indexer.db))
+			indexer.tail.Store(rawdb.ReadTxIndexTail(indexer.store))
 
 		case ch := <-indexer.term:
 			if stop != nil {
@@ -330,4 +336,51 @@ func (indexer *txIndexer) close() {
 		<-ch
 	case <-indexer.closed:
 	}
+}
+
+// migrateToStore
+func (indexer *txIndexer) migrateToStore() {
+	start := time.Now()
+	tail := rawdb.ReadTxIndexTail(indexer.db)
+	if tail == nil {
+		return
+	}
+
+	log.Info("Starting transaction index migration...")
+	batch := indexer.store.NewBatch()
+
+	migrated := 0
+	done := make(chan struct{})
+	defer close(done)
+	go func() {
+		for {
+			select {
+			case <-done:
+				return
+			case <-time.After(time.Second * 10):
+				log.Info("Transaction index migration in progress...", "time", time.Since(start), "done", migrated)
+			}
+		}
+	}()
+
+	rawdb.DeleteAllTxLookupEntries(indexer.db, func(hash common.Hash, b []byte) bool {
+		rawdb.WriteTxLookupEntry(batch, hash, b)
+		migrated++
+
+		if batch.ValueSize() >= ethdb.IdealBatchSize {
+			if err := batch.Write(); err != nil {
+				log.Crit("Failed to delete transaction lookup entries", "err", err)
+			}
+			log.Info("Transaction index migration in progress...", "time", time.Since(start))
+			batch.Reset()
+		}
+		return true
+	})
+	rawdb.DeleteTxIndexTail(indexer.db)
+
+	if err := batch.Write(); err != nil {
+		log.Crit("Failed to delete transaction lookup entries", "err", err)
+	}
+	rawdb.WriteTxIndexTail(indexer.store, *tail)
+	log.Info("Transaction index migration is done!", "time", time.Since(start))
 }

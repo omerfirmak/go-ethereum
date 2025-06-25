@@ -173,6 +173,7 @@ type AncientStater interface {
 type Reader interface {
 	KeyValueReader
 	AncientReader
+	IndexReader
 }
 
 // AncientStore contains all the methods required to allow handling different
@@ -197,4 +198,14 @@ type ResettableAncientStore interface {
 type Database interface {
 	KeyValueStore
 	AncientStore
+	IndexStore
+}
+
+type IndexReader interface {
+	IndexReader() KeyValueReader
+}
+
+type IndexStore interface {
+	IndexReader
+	IndexStore() KeyValueStore
 }

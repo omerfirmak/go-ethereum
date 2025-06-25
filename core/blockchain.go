@@ -1198,6 +1198,13 @@ func (bc *BlockChain) writeHeadBlock(block *types.Block) {
 	if err := batch.Write(); err != nil {
 		log.Crit("Failed to update chain indexes and markers", "err", err)
 	}
+
+	batch = bc.db.IndexStore().NewBatch()
+	rawdb.WriteTxLookupEntriesByBlock(batch, block)
+	if err := batch.Write(); err != nil {
+		log.Error("Failed to update tx lookup indexes", "err", err)
+	}
+
 	// Update all in-memory chain markers in the last step
 	bc.hc.SetCurrentHeader(block.Header())
 

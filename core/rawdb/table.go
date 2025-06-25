@@ -40,6 +40,16 @@ func (t *table) Close() error {
 	return nil
 }
 
+// IndexStore
+func (t *table) IndexReader() ethdb.KeyValueReader {
+	return t.db.IndexReader()
+}
+
+// IndexStore
+func (t *table) IndexStore() ethdb.KeyValueStore {
+	return t.db.IndexStore()
+}
+
 // Has retrieves if a prefixed version of a key is present in the database.
 func (t *table) Has(key []byte) (bool, error) {
 	return t.db.Has(append([]byte(t.prefix), key...))
