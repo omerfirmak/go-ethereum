@@ -628,14 +628,24 @@ func opSload(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]by
 	return nil, nil
 }
 
+func opSstoreEIP2200(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byte, error) {
+	if err := deductDynamicGas(gasSStoreEIP2200, interpreter, scope, 0); err != nil {
+		return nil, err
+	}
+	return opSstore(pc, interpreter, scope)
+}
+
+func opSstoreFrontier(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byte, error) {
+	if err := deductDynamicGas(gasSStore, interpreter, scope, 0); err != nil {
+		return nil, err
+	}
+	return opSstore(pc, interpreter, scope)
+}
+
 func opSstore(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byte, error) {
 	if interpreter.readOnly {
 		return nil, ErrWriteProtection
 	}
-	if err := deductDynamicGas(gasSStore, interpreter, scope, 0); err != nil {
-		return nil, err
-	}
-
 	loc := scope.Stack.pop()
 	val := scope.Stack.pop()
 	interpreter.evm.StateDB.SetState(scope.Contract.Address(), loc.Bytes32(), val.Bytes32())
