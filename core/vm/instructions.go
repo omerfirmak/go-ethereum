@@ -26,6 +26,36 @@ import (
 	"github.com/holiman/uint256"
 )
 
+// resizeMem calculates the required memory size and resizes memory if needed
+// it is important that this function is inlinable
+func resizeMem(memF memorySizeFunc, stack *Stack, mem *Memory) (uint64, error) {
+	memSize, overflow := memF(stack)
+	// memory is expanded in words of 32 bytes. Gas
+	// is also calculated in words.
+	if overflow || memSize > math.MaxUint64-31 {
+		return 0, ErrGasUintOverflow
+	}
+	memorySize := ((memSize + 31) / 32) * 32
+	mem.Resize(memorySize)
+	return memorySize, nil
+}
+
+// deductDynamicGas calculates the required dynamic gas and deducts the amount if possible
+// it is important that this function is inlinable
+func deductDynamicGas(gasF gasFunc, interpreter *EVMInterpreter, scope *ScopeContext, memorySize uint64) error {
+	dynamicCost, err := gasF(interpreter.evm, scope.Contract, scope.Stack, scope.Memory, memorySize)
+	if err != nil {
+		return err
+	}
+
+	if scope.Contract.Gas < dynamicCost {
+		return ErrOutOfGas
+	} else {
+		scope.Contract.Gas -= dynamicCost
+	}
+	return nil
+}
+
 func opAdd(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byte, error) {
 	x, y := scope.Stack.pop(), scope.Stack.peek()
 	y.Add(&x, y)
