@@ -921,6 +921,14 @@ func opCallCode(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([
 }
 
 func opDelegateCall(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byte, error) {
+	memorySize, err := resizeMem(memoryDelegateCall, scope.Stack, scope.Memory)
+	if err != nil {
+		return nil, err
+	}
+	if err = deductDynamicGas(gasDelegateCall, interpreter, scope, memorySize); err != nil {
+		return nil, err
+	}
+
 	stack := scope.Stack
 	// Pop gas. The actual gas is in interpreter.evm.callGasTemp.
 	// We use it as a temporary value
