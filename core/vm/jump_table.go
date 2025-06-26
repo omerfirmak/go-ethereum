@@ -186,12 +186,10 @@ func newConstantinopleInstructionSet() JumpTable {
 func newByzantiumInstructionSet() JumpTable {
 	instructionSet := newSpuriousDragonInstructionSet()
 	instructionSet[STATICCALL] = &operation{
-		execute:     opStaticCall,
+		execute:     opStaticCallByzantium,
 		constantGas: params.CallGasEIP150,
-		dynamicGas:  gasStaticCall,
 		minStack:    minStack(6, 1),
 		maxStack:    maxStack(6, 1),
-		memorySize:  memoryStaticCall,
 	}
 	instructionSet[RETURNDATASIZE] = &operation{
 		execute:     opReturnDataSize,
@@ -202,17 +200,13 @@ func newByzantiumInstructionSet() JumpTable {
 	instructionSet[RETURNDATACOPY] = &operation{
 		execute:     opReturnDataCopy,
 		constantGas: GasFastestStep,
-		dynamicGas:  gasReturnDataCopy,
 		minStack:    minStack(3, 0),
 		maxStack:    maxStack(3, 0),
-		memorySize:  memoryReturnDataCopy,
 	}
 	instructionSet[REVERT] = &operation{
-		execute:    opRevert,
-		dynamicGas: gasRevert,
-		minStack:   minStack(2, 0),
-		maxStack:   maxStack(2, 0),
-		memorySize: memoryRevert,
+		execute:  opRevert,
+		minStack: minStack(2, 0),
+		maxStack: maxStack(2, 0),
 	}
 	return validate(instructionSet)
 }
