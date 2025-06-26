@@ -374,6 +374,14 @@ func opReturnDataSize(pc *uint64, interpreter *EVMInterpreter, scope *ScopeConte
 }
 
 func opReturnDataCopy(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byte, error) {
+	memorySize, err := resizeMem(memoryReturnDataCopy, scope.Stack, scope.Memory)
+	if err != nil {
+		return nil, err
+	}
+	if err = deductDynamicGas(gasReturnDataCopy, interpreter, scope, memorySize); err != nil {
+		return nil, err
+	}
+
 	var (
 		memOffset  = scope.Stack.pop()
 		dataOffset = scope.Stack.pop()
@@ -969,6 +977,18 @@ func opDelegateCall(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext
 	return ret, nil
 }
 
+func opStaticCallByzantium(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byte, error) {
+	memorySize, err := resizeMem(memoryStaticCall, scope.Stack, scope.Memory)
+	if err != nil {
+		return nil, err
+	}
+	if err = deductDynamicGas(gasStaticCall, interpreter, scope, memorySize); err != nil {
+		return nil, err
+	}
+
+	return opStaticCall(pc, interpreter, scope)
+}
+
 func opStaticCall(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byte, error) {
 	// Pop gas. The actual gas is in interpreter.evm.callGasTemp.
 	stack := scope.Stack
@@ -1014,6 +1034,14 @@ func opReturn(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]b
 }
 
 func opRevert(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byte, error) {
+	memorySize, err := resizeMem(memoryRevert, scope.Stack, scope.Memory)
+	if err != nil {
+		return nil, err
+	}
+	if err = deductDynamicGas(gasRevert, interpreter, scope, memorySize); err != nil {
+		return nil, err
+	}
+
 	offset, size := scope.Stack.pop(), scope.Stack.pop()
 	ret := scope.Memory.GetCopy(offset.Uint64(), size.Uint64())
 
