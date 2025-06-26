@@ -98,11 +98,23 @@ func opSmod(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byt
 	return nil, nil
 }
 
-func opExp(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byte, error) {
+func opExpEIP158(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byte, error) {
+	if err := deductDynamicGas(gasExpEIP158, interpreter, scope, 0); err != nil {
+		return nil, err
+	}
+
+	return opExp(pc, interpreter, scope)
+}
+
+func opExpFrontier(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byte, error) {
 	if err := deductDynamicGas(gasExpFrontier, interpreter, scope, 0); err != nil {
 		return nil, err
 	}
 
+	return opExp(pc, interpreter, scope)
+}
+
+func opExp(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byte, error) {
 	base, exponent := scope.Stack.pop(), scope.Stack.peek()
 	exponent.Exp(&base, exponent)
 	return nil, nil
