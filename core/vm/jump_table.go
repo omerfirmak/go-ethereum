@@ -243,11 +243,9 @@ func newHomesteadInstructionSet() JumpTable {
 	instructionSet := newFrontierInstructionSet()
 	instructionSet[DELEGATECALL] = &operation{
 		execute:     opDelegateCall,
-		dynamicGas:  gasDelegateCall,
 		constantGas: params.CallGasFrontier,
 		minStack:    minStack(6, 1),
 		maxStack:    maxStack(6, 1),
-		memorySize:  memoryDelegateCall,
 	}
 	return validate(instructionSet)
 }
