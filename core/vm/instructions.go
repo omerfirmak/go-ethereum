@@ -673,6 +673,13 @@ func opSload(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]by
 	return nil, nil
 }
 
+func opSstoreEIP3529(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byte, error) {
+	if err := deductDynamicGas(gasSStoreEIP3529, interpreter, scope, 0); err != nil {
+		return nil, err
+	}
+	return opSstore(pc, interpreter, scope)
+}
+
 func opSstoreEIP2200(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byte, error) {
 	if err := deductDynamicGas(gasSStoreEIP2200, interpreter, scope, 0); err != nil {
 		return nil, err
@@ -1197,6 +1204,14 @@ func opUndefined(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) (
 
 func opStop(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byte, error) {
 	return nil, errStopToken
+}
+
+func opSelfdestructEIP3529(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byte, error) {
+	if err := deductDynamicGas(gasSelfdestructEIP3529, interpreter, scope, 0); err != nil {
+		return nil, err
+	}
+
+	return opSelfdestruct(pc, interpreter, scope)
 }
 
 func opSelfdestructEIP2929(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byte, error) {

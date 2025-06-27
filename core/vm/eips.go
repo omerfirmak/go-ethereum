@@ -162,8 +162,8 @@ func enable2929(jt *JumpTable) {
 // - Reduces refunds for SSTORE
 // - Reduces max refunds to 20% gas
 func enable3529(jt *JumpTable) {
-	jt[SSTORE].dynamicGas = gasSStoreEIP3529
-	jt[SELFDESTRUCT].dynamicGas = gasSelfdestructEIP3529
+	jt[SSTORE].execute = opSstoreEIP3529
+	jt[SELFDESTRUCT].execute = opSelfdestructEIP3529
 }
 
 // enable3198 applies EIP-3198 (BASEFEE Opcode)
