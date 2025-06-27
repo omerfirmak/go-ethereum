@@ -304,6 +304,13 @@ func opAddress(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]
 	return nil, nil
 }
 
+func opBalanceEIP2929(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byte, error) {
+	if err := deductDynamicGas(gasEip2929AccountCheck, interpreter, scope, 0); err != nil {
+		return nil, err
+	}
+	return opBalance(pc, interpreter, scope)
+}
+
 func opBalance(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byte, error) {
 	slot := scope.Stack.peek()
 	address := common.Address(slot.Bytes20())
@@ -403,6 +410,13 @@ func opReturnDataCopy(pc *uint64, interpreter *EVMInterpreter, scope *ScopeConte
 	return nil, nil
 }
 
+func opExtCodeSizeEIP2929(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byte, error) {
+	if err := deductDynamicGas(gasEip2929AccountCheck, interpreter, scope, 0); err != nil {
+		return nil, err
+	}
+	return opExtCodeSize(pc, interpreter, scope)
+}
+
 func opExtCodeSize(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byte, error) {
 	slot := scope.Stack.peek()
 	slot.SetUint64(uint64(interpreter.evm.StateDB.GetCodeSize(slot.Bytes20())))
@@ -438,7 +452,19 @@ func opCodeCopy(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([
 	return nil, nil
 }
 
-func opExtCodeCopy(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byte, error) {
+func opExtCodeCopyEIP2929(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byte, error) {
+	memorySize, err := resizeMem(memoryExtCodeCopy, scope.Stack, scope.Memory)
+	if err != nil {
+		return nil, err
+	}
+	if err = deductDynamicGas(gasExtCodeCopyEIP2929, interpreter, scope, memorySize); err != nil {
+		return nil, err
+	}
+
+	return opExtCodeCopy(pc, interpreter, scope)
+}
+
+func opExtCodeCopyFrontier(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byte, error) {
 	memorySize, err := resizeMem(memoryExtCodeCopy, scope.Stack, scope.Memory)
 	if err != nil {
 		return nil, err
@@ -447,6 +473,10 @@ func opExtCodeCopy(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext)
 		return nil, err
 	}
 
+	return opExtCodeCopy(pc, interpreter, scope)
+}
+
+func opExtCodeCopy(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byte, error) {
 	var (
 		stack      = scope.Stack
 		a          = stack.pop()
@@ -464,6 +494,13 @@ func opExtCodeCopy(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext)
 	scope.Memory.Set(memOffset.Uint64(), length.Uint64(), codeCopy)
 
 	return nil, nil
+}
+
+func opExtCodeHashEIP2929(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byte, error) {
+	if err := deductDynamicGas(gasEip2929AccountCheck, interpreter, scope, 0); err != nil {
+		return nil, err
+	}
+	return opExtCodeHash(pc, interpreter, scope)
 }
 
 // opExtCodeHash returns the code hash of a specified account.
@@ -620,6 +657,14 @@ func opMstore8(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]
 	return nil, nil
 }
 
+func opSLoadEIP2929(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byte, error) {
+	if err := deductDynamicGas(gasSLoadEIP2929, interpreter, scope, 0); err != nil {
+		return nil, err
+	}
+
+	return opSload(pc, interpreter, scope)
+}
+
 func opSload(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byte, error) {
 	loc := scope.Stack.peek()
 	hash := common.Hash(loc.Bytes32())
@@ -630,6 +675,13 @@ func opSload(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]by
 
 func opSstoreEIP2200(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byte, error) {
 	if err := deductDynamicGas(gasSStoreEIP2200, interpreter, scope, 0); err != nil {
+		return nil, err
+	}
+	return opSstore(pc, interpreter, scope)
+}
+
+func opSstoreEIP2929(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byte, error) {
+	if err := deductDynamicGas(gasSStoreEIP2929, interpreter, scope, 0); err != nil {
 		return nil, err
 	}
 	return opSstore(pc, interpreter, scope)
@@ -877,6 +929,30 @@ func opCreate2(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]
 	return nil, nil
 }
 
+func opCallEIP2929(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byte, error) {
+	memorySize, err := resizeMem(memoryCall, scope.Stack, scope.Memory)
+	if err != nil {
+		return nil, err
+	}
+	if err = deductDynamicGas(gasCallEIP2929, interpreter, scope, memorySize); err != nil {
+		return nil, err
+	}
+
+	return opCall(pc, interpreter, scope)
+}
+
+func opCallFrontier(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byte, error) {
+	memorySize, err := resizeMem(memoryCall, scope.Stack, scope.Memory)
+	if err != nil {
+		return nil, err
+	}
+	if err = deductDynamicGas(gasCall, interpreter, scope, memorySize); err != nil {
+		return nil, err
+	}
+
+	return opCall(pc, interpreter, scope)
+}
+
 func opCall(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byte, error) {
 	memorySize, err := resizeMem(memoryCall, scope.Stack, scope.Memory)
 	if err != nil {
@@ -921,7 +997,19 @@ func opCall(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byt
 	return ret, nil
 }
 
-func opCallCode(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byte, error) {
+func opCallCodeEIP2929(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byte, error) {
+	memorySize, err := resizeMem(memoryCall, scope.Stack, scope.Memory)
+	if err != nil {
+		return nil, err
+	}
+	if err = deductDynamicGas(gasCallCodeEIP2929, interpreter, scope, memorySize); err != nil {
+		return nil, err
+	}
+
+	return opCallCode(pc, interpreter, scope)
+}
+
+func opCallCodeFrontier(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byte, error) {
 	memorySize, err := resizeMem(memoryCall, scope.Stack, scope.Memory)
 	if err != nil {
 		return nil, err
@@ -930,6 +1018,10 @@ func opCallCode(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([
 		return nil, err
 	}
 
+	return opCallCode(pc, interpreter, scope)
+}
+
+func opCallCode(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byte, error) {
 	// Pop gas. The actual gas is in interpreter.evm.callGasTemp.
 	stack := scope.Stack
 	// We use it as a temporary value
@@ -962,15 +1054,19 @@ func opCallCode(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([
 	return ret, nil
 }
 
-func opDelegateCall(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byte, error) {
+func opDelegateCallEIP2929(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byte, error) {
 	memorySize, err := resizeMem(memoryDelegateCall, scope.Stack, scope.Memory)
 	if err != nil {
 		return nil, err
 	}
-	if err = deductDynamicGas(gasDelegateCall, interpreter, scope, memorySize); err != nil {
+	if err = deductDynamicGas(gasDelegateCallEIP2929, interpreter, scope, memorySize); err != nil {
 		return nil, err
 	}
 
+	return opDelegateCall(pc, interpreter, scope)
+}
+
+func opDelegateCall(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byte, error) {
 	stack := scope.Stack
 	// Pop gas. The actual gas is in interpreter.evm.callGasTemp.
 	// We use it as a temporary value
@@ -999,12 +1095,36 @@ func opDelegateCall(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext
 	return ret, nil
 }
 
+func opDelegateCallHomestead(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byte, error) {
+	memorySize, err := resizeMem(memoryDelegateCall, scope.Stack, scope.Memory)
+	if err != nil {
+		return nil, err
+	}
+	if err = deductDynamicGas(gasDelegateCall, interpreter, scope, memorySize); err != nil {
+		return nil, err
+	}
+
+	return opDelegateCall(pc, interpreter, scope)
+}
+
 func opStaticCallByzantium(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byte, error) {
 	memorySize, err := resizeMem(memoryStaticCall, scope.Stack, scope.Memory)
 	if err != nil {
 		return nil, err
 	}
 	if err = deductDynamicGas(gasStaticCall, interpreter, scope, memorySize); err != nil {
+		return nil, err
+	}
+
+	return opStaticCall(pc, interpreter, scope)
+}
+
+func opStaticCallEIP2929(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byte, error) {
+	memorySize, err := resizeMem(memoryStaticCall, scope.Stack, scope.Memory)
+	if err != nil {
+		return nil, err
+	}
+	if err = deductDynamicGas(gasStaticCallEIP2929, interpreter, scope, memorySize); err != nil {
 		return nil, err
 	}
 
@@ -1079,12 +1199,25 @@ func opStop(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byt
 	return nil, errStopToken
 }
 
+func opSelfdestructEIP2929(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byte, error) {
+	if err := deductDynamicGas(gasSelfdestructEIP2929, interpreter, scope, 0); err != nil {
+		return nil, err
+	}
+
+	return opSelfdestruct(pc, interpreter, scope)
+}
+
+func opSelfdestructFrontier(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byte, error) {
+	if err := deductDynamicGas(gasSelfdestruct, interpreter, scope, 0); err != nil {
+		return nil, err
+	}
+
+	return opSelfdestruct(pc, interpreter, scope)
+}
+
 func opSelfdestruct(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byte, error) {
 	if interpreter.readOnly {
 		return nil, ErrWriteProtection
-	}
-	if err := deductDynamicGas(gasSelfdestruct, interpreter, scope, 0); err != nil {
-		return nil, err
 	}
 
 	beneficiary := scope.Stack.pop()
