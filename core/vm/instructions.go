@@ -1234,6 +1234,14 @@ func opStop(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byt
 	return nil, errStopToken
 }
 
+func opSelfdestructEIP6780(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byte, error) {
+	if err := deductDynamicGas(gasSelfdestructEIP3529, interpreter, scope, 0); err != nil {
+		return nil, err
+	}
+
+	return opSelfdestruct6780(pc, interpreter, scope)
+}
+
 func opSelfdestructEIP3529(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byte, error) {
 	if err := deductDynamicGas(gasSelfdestructEIP3529, interpreter, scope, 0); err != nil {
 		return nil, err

@@ -254,15 +254,21 @@ func enable5656(jt *JumpTable) {
 	jt[MCOPY] = &operation{
 		execute:     opMcopy,
 		constantGas: GasFastestStep,
-		dynamicGas:  gasMcopy,
 		minStack:    minStack(3, 0),
 		maxStack:    maxStack(3, 0),
-		memorySize:  memoryMcopy,
 	}
 }
 
 // opMcopy implements the MCOPY opcode (https://eips.ethereum.org/EIPS/eip-5656)
 func opMcopy(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byte, error) {
+	memorySize, err := resizeMem(memoryMcopy, scope.Stack, scope.Memory)
+	if err != nil {
+		return nil, err
+	}
+	if err = deductDynamicGas(gasMcopy, interpreter, scope, memorySize); err != nil {
+		return nil, err
+	}
+
 	var (
 		dst    = scope.Stack.pop()
 		src    = scope.Stack.pop()
@@ -316,8 +322,7 @@ func enable7516(jt *JumpTable) {
 // enable6780 applies EIP-6780 (deactivate SELFDESTRUCT)
 func enable6780(jt *JumpTable) {
 	jt[SELFDESTRUCT] = &operation{
-		execute:     opSelfdestruct6780,
-		dynamicGas:  gasSelfdestructEIP3529,
+		execute:     opSelfdestructEIP6780,
 		constantGas: params.SelfdestructGasEIP150,
 		minStack:    minStack(1, 0),
 		maxStack:    maxStack(1, 0),
