@@ -538,8 +538,8 @@ func enable4762(jt *JumpTable) {
 
 // enable7702 the EIP-7702 changes to support delegation designators.
 func enable7702(jt *JumpTable) {
-	jt[CALL].dynamicGas = gasCallEIP7702
-	jt[CALLCODE].dynamicGas = gasCallCodeEIP7702
-	jt[STATICCALL].dynamicGas = gasStaticCallEIP7702
-	jt[DELEGATECALL].dynamicGas = gasDelegateCallEIP7702
+	jt[CALL].execute = opCallEIP7702
+	jt[CALLCODE].execute = opCallCodeEIP7702
+	jt[STATICCALL].execute = opStaticCallEIP7702
+	jt[DELEGATECALL].execute = opDelegateCallEIP7702
 }
