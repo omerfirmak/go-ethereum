@@ -411,129 +411,134 @@ func makePushEIP4762(size uint64, pushByteSize int) executionFunc {
 }
 
 func enable4762(jt *JumpTable) {
-	jt[SSTORE] = &operation{
-		dynamicGas: gasSStore4762,
-		execute:    opSstore,
-		minStack:   minStack(2, 0),
-		maxStack:   maxStack(2, 0),
-	}
-	jt[SLOAD] = &operation{
-		dynamicGas: gasSLoad4762,
-		execute:    opSload,
-		minStack:   minStack(1, 1),
-		maxStack:   maxStack(1, 1),
-	}
+	return
 
-	jt[BALANCE] = &operation{
-		execute:    opBalance,
-		dynamicGas: gasBalance4762,
-		minStack:   minStack(1, 1),
-		maxStack:   maxStack(1, 1),
-	}
+	/*
 
-	jt[EXTCODESIZE] = &operation{
-		execute:    opExtCodeSize,
-		dynamicGas: gasExtCodeSize4762,
-		minStack:   minStack(1, 1),
-		maxStack:   maxStack(1, 1),
-	}
+		jt[SSTORE] = &operation{
+			dynamicGas: gasSStore4762,
+			execute:    opSstore,
+			minStack:   minStack(2, 0),
+			maxStack:   maxStack(2, 0),
+		}
+		jt[SLOAD] = &operation{
+			dynamicGas: gasSLoad4762,
+			execute:    opSload,
+			minStack:   minStack(1, 1),
+			maxStack:   maxStack(1, 1),
+		}
 
-	jt[EXTCODEHASH] = &operation{
-		execute:    opExtCodeHash,
-		dynamicGas: gasExtCodeHash4762,
-		minStack:   minStack(1, 1),
-		maxStack:   maxStack(1, 1),
-	}
+		jt[BALANCE] = &operation{
+			execute:    opBalance,
+			dynamicGas: gasBalance4762,
+			minStack:   minStack(1, 1),
+			maxStack:   maxStack(1, 1),
+		}
 
-	jt[EXTCODECOPY] = &operation{
-		execute:    opExtCodeCopyEIP4762,
-		dynamicGas: gasExtCodeCopyEIP4762,
-		minStack:   minStack(4, 0),
-		maxStack:   maxStack(4, 0),
-		memorySize: memoryExtCodeCopy,
-	}
+		jt[EXTCODESIZE] = &operation{
+			execute:    opExtCodeSize,
+			dynamicGas: gasExtCodeSize4762,
+			minStack:   minStack(1, 1),
+			maxStack:   maxStack(1, 1),
+		}
 
-	jt[CODECOPY] = &operation{
-		execute:     opCodeCopy,
-		constantGas: GasFastestStep,
-		dynamicGas:  gasCodeCopyEip4762,
-		minStack:    minStack(3, 0),
-		maxStack:    maxStack(3, 0),
-		memorySize:  memoryCodeCopy,
-	}
+		jt[EXTCODEHASH] = &operation{
+			execute:    opExtCodeHash,
+			dynamicGas: gasExtCodeHash4762,
+			minStack:   minStack(1, 1),
+			maxStack:   maxStack(1, 1),
+		}
 
-	jt[SELFDESTRUCT] = &operation{
-		execute:     opSelfdestruct6780,
-		dynamicGas:  gasSelfdestructEIP4762,
-		constantGas: params.SelfdestructGasEIP150,
-		minStack:    minStack(1, 0),
-		maxStack:    maxStack(1, 0),
-	}
+		jt[EXTCODECOPY] = &operation{
+			execute:    opExtCodeCopyEIP4762,
+			dynamicGas: gasExtCodeCopyEIP4762,
+			minStack:   minStack(4, 0),
+			maxStack:   maxStack(4, 0),
+			memorySize: memoryExtCodeCopy,
+		}
 
-	jt[CREATE] = &operation{
-		execute:     opCreate,
-		constantGas: params.CreateNGasEip4762,
-		dynamicGas:  gasCreateEip3860,
-		minStack:    minStack(3, 1),
-		maxStack:    maxStack(3, 1),
-		memorySize:  memoryCreate,
-	}
+		jt[CODECOPY] = &operation{
+			execute:     opCodeCopy,
+			constantGas: GasFastestStep,
+			dynamicGas:  gasCodeCopyEip4762,
+			minStack:    minStack(3, 0),
+			maxStack:    maxStack(3, 0),
+			memorySize:  memoryCodeCopy,
+		}
 
-	jt[CREATE2] = &operation{
-		execute:     opCreate2,
-		constantGas: params.CreateNGasEip4762,
-		dynamicGas:  gasCreate2Eip3860,
-		minStack:    minStack(4, 1),
-		maxStack:    maxStack(4, 1),
-		memorySize:  memoryCreate2,
-	}
+		jt[SELFDESTRUCT] = &operation{
+			execute:     opSelfdestruct6780,
+			dynamicGas:  gasSelfdestructEIP4762,
+			constantGas: params.SelfdestructGasEIP150,
+			minStack:    minStack(1, 0),
+			maxStack:    maxStack(1, 0),
+		}
 
-	jt[CALL] = &operation{
-		execute:    opCall,
-		dynamicGas: gasCallEIP4762,
-		minStack:   minStack(7, 1),
-		maxStack:   maxStack(7, 1),
-		memorySize: memoryCall,
-	}
+		jt[CREATE] = &operation{
+			execute:     opCreate,
+			constantGas: params.CreateNGasEip4762,
+			dynamicGas:  gasCreateEip3860,
+			minStack:    minStack(3, 1),
+			maxStack:    maxStack(3, 1),
+			memorySize:  memoryCreate,
+		}
 
-	jt[CALLCODE] = &operation{
-		execute:    opCallCode,
-		dynamicGas: gasCallCodeEIP4762,
-		minStack:   minStack(7, 1),
-		maxStack:   maxStack(7, 1),
-		memorySize: memoryCall,
-	}
+		jt[CREATE2] = &operation{
+			execute:     opCreate2,
+			constantGas: params.CreateNGasEip4762,
+			dynamicGas:  gasCreate2Eip3860,
+			minStack:    minStack(4, 1),
+			maxStack:    maxStack(4, 1),
+			memorySize:  memoryCreate2,
+		}
 
-	jt[STATICCALL] = &operation{
-		execute:    opStaticCall,
-		dynamicGas: gasStaticCallEIP4762,
-		minStack:   minStack(6, 1),
-		maxStack:   maxStack(6, 1),
-		memorySize: memoryStaticCall,
-	}
+		jt[CALL] = &operation{
+			execute:    opCall,
+			dynamicGas: gasCallEIP4762,
+			minStack:   minStack(7, 1),
+			maxStack:   maxStack(7, 1),
+			memorySize: memoryCall,
+		}
 
-	jt[DELEGATECALL] = &operation{
-		execute:    opDelegateCall,
-		dynamicGas: gasDelegateCallEIP4762,
-		minStack:   minStack(6, 1),
-		maxStack:   maxStack(6, 1),
-		memorySize: memoryDelegateCall,
-	}
+		jt[CALLCODE] = &operation{
+			execute:    opCallCode,
+			dynamicGas: gasCallCodeEIP4762,
+			minStack:   minStack(7, 1),
+			maxStack:   maxStack(7, 1),
+			memorySize: memoryCall,
+		}
 
-	jt[PUSH1] = &operation{
-		execute:     opPush1EIP4762,
-		constantGas: GasFastestStep,
-		minStack:    minStack(0, 1),
-		maxStack:    maxStack(0, 1),
-	}
-	for i := 1; i < 32; i++ {
-		jt[PUSH1+OpCode(i)] = &operation{
-			execute:     makePushEIP4762(uint64(i+1), i+1),
+		jt[STATICCALL] = &operation{
+			execute:    opStaticCall,
+			dynamicGas: gasStaticCallEIP4762,
+			minStack:   minStack(6, 1),
+			maxStack:   maxStack(6, 1),
+			memorySize: memoryStaticCall,
+		}
+
+		jt[DELEGATECALL] = &operation{
+			execute:    opDelegateCall,
+			dynamicGas: gasDelegateCallEIP4762,
+			minStack:   minStack(6, 1),
+			maxStack:   maxStack(6, 1),
+			memorySize: memoryDelegateCall,
+		}
+
+		jt[PUSH1] = &operation{
+			execute:     opPush1EIP4762,
 			constantGas: GasFastestStep,
 			minStack:    minStack(0, 1),
 			maxStack:    maxStack(0, 1),
 		}
-	}
+		for i := 1; i < 32; i++ {
+			jt[PUSH1+OpCode(i)] = &operation{
+				execute:     makePushEIP4762(uint64(i+1), i+1),
+				constantGas: GasFastestStep,
+				minStack:    minStack(0, 1),
+				maxStack:    maxStack(0, 1),
+			}
+		}
+	*/
 }
 
 // enable7702 the EIP-7702 changes to support delegation designators.
