@@ -244,8 +244,8 @@ func opPush0(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]by
 // enable3860 enables "EIP-3860: Limit and meter initcode"
 // https://eips.ethereum.org/EIPS/eip-3860
 func enable3860(jt *JumpTable) {
-	jt[CREATE].dynamicGas = gasCreateEip3860
-	jt[CREATE2].dynamicGas = gasCreate2Eip3860
+	jt[CREATE].execute = opCreateEIP3860
+	jt[CREATE2].execute = opCreate2EIP3860
 }
 
 // enable5656 enables EIP-5656 (MCOPY opcode)
