@@ -234,7 +234,7 @@ func newTangerineWhistleInstructionSet() JumpTable {
 func newHomesteadInstructionSet() JumpTable {
 	instructionSet := newFrontierInstructionSet()
 	instructionSet[DELEGATECALL] = &operation{
-		execute:     opDelegateCall,
+		execute:     opDelegateCallHomestead,
 		constantGas: params.CallGasFrontier,
 		minStack:    minStack(6, 1),
 		maxStack:    maxStack(6, 1),
@@ -462,7 +462,7 @@ func newFrontierInstructionSet() JumpTable {
 			maxStack:    maxStack(1, 1),
 		},
 		EXTCODECOPY: {
-			execute:     opExtCodeCopy,
+			execute:     opExtCodeCopyFrontier,
 			constantGas: params.ExtcodeCopyBaseFrontier,
 			minStack:    minStack(4, 0),
 			maxStack:    maxStack(4, 0),
@@ -990,13 +990,13 @@ func newFrontierInstructionSet() JumpTable {
 			maxStack:    maxStack(3, 1),
 		},
 		CALL: {
-			execute:     opCall,
+			execute:     opCallFrontier,
 			constantGas: params.CallGasFrontier,
 			minStack:    minStack(7, 1),
 			maxStack:    maxStack(7, 1),
 		},
 		CALLCODE: {
-			execute:     opCallCode,
+			execute:     opCallCodeFrontier,
 			constantGas: params.CallGasFrontier,
 			minStack:    minStack(7, 1),
 			maxStack:    maxStack(7, 1),
@@ -1007,7 +1007,7 @@ func newFrontierInstructionSet() JumpTable {
 			maxStack: maxStack(2, 0),
 		},
 		SELFDESTRUCT: {
-			execute:  opSelfdestruct,
+			execute:  opSelfdestructFrontier,
 			minStack: minStack(1, 0),
 			maxStack: maxStack(1, 0),
 		},
