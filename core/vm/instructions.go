@@ -1001,14 +1001,6 @@ func opCallFrontier(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext
 }
 
 func opCall(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byte, error) {
-	memorySize, err := resizeMem(memoryCall, scope.Stack, scope.Memory)
-	if err != nil {
-		return nil, err
-	}
-	if err = deductDynamicGas(gasCall, interpreter, scope, memorySize); err != nil {
-		return nil, err
-	}
-
 	stack := scope.Stack
 	// Pop gas. The actual gas in interpreter.evm.callGasTemp.
 	// We can use this as a temporary value
