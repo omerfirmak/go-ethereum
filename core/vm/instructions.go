@@ -836,17 +836,33 @@ func opSwap16(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]b
 	return nil, nil
 }
 
-func opCreate(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byte, error) {
-	if interpreter.readOnly {
-		return nil, ErrWriteProtection
+func opCreateEIP3860(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byte, error) {
+	memorySize, err := resizeMem(memoryCreate, scope.Stack, scope.Memory)
+	if err != nil {
+		return nil, err
+	}
+	if err = deductDynamicGas(gasCreateEip3860, interpreter, scope, memorySize); err != nil {
+		return nil, err
 	}
 
+	return opCreate(pc, interpreter, scope)
+}
+
+func opCreateFrontier(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byte, error) {
 	memorySize, err := resizeMem(memoryCreate, scope.Stack, scope.Memory)
 	if err != nil {
 		return nil, err
 	}
 	if err = deductDynamicGas(gasCreate, interpreter, scope, memorySize); err != nil {
 		return nil, err
+	}
+
+	return opCreate(pc, interpreter, scope)
+}
+
+func opCreate(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byte, error) {
+	if interpreter.readOnly {
+		return nil, ErrWriteProtection
 	}
 
 	var (
@@ -886,6 +902,18 @@ func opCreate(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]b
 	}
 	interpreter.returnData = nil // clear dirty return data buffer
 	return nil, nil
+}
+
+func opCreate2EIP3860(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byte, error) {
+	memorySize, err := resizeMem(memoryCreate2, scope.Stack, scope.Memory)
+	if err != nil {
+		return nil, err
+	}
+	if err = deductDynamicGas(gasCreate2Eip3860, interpreter, scope, memorySize); err != nil {
+		return nil, err
+	}
+
+	return opCreate2(pc, interpreter, scope)
 }
 
 func opCreate2Constantinople(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byte, error) {

@@ -984,7 +984,7 @@ func newFrontierInstructionSet() JumpTable {
 			maxStack: maxStack(6, 0),
 		},
 		CREATE: {
-			execute:     opCreate,
+			execute:     opCreateFrontier,
 			constantGas: params.CreateGas,
 			minStack:    minStack(3, 1),
 			maxStack:    maxStack(3, 1),
