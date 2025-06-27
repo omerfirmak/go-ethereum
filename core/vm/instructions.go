@@ -964,6 +964,18 @@ func opCreate2(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]
 	return nil, nil
 }
 
+func opCallEIP7702(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byte, error) {
+	memorySize, err := resizeMem(memoryCall, scope.Stack, scope.Memory)
+	if err != nil {
+		return nil, err
+	}
+	if err = deductDynamicGas(gasCallEIP7702, interpreter, scope, memorySize); err != nil {
+		return nil, err
+	}
+
+	return opCall(pc, interpreter, scope)
+}
+
 func opCallEIP2929(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byte, error) {
 	memorySize, err := resizeMem(memoryCall, scope.Stack, scope.Memory)
 	if err != nil {
@@ -1032,6 +1044,18 @@ func opCall(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byt
 	return ret, nil
 }
 
+func opCallCodeEIP7702(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byte, error) {
+	memorySize, err := resizeMem(memoryCall, scope.Stack, scope.Memory)
+	if err != nil {
+		return nil, err
+	}
+	if err = deductDynamicGas(gasCallCodeEIP7702, interpreter, scope, memorySize); err != nil {
+		return nil, err
+	}
+
+	return opCallCode(pc, interpreter, scope)
+}
+
 func opCallCodeEIP2929(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byte, error) {
 	memorySize, err := resizeMem(memoryCall, scope.Stack, scope.Memory)
 	if err != nil {
@@ -1089,6 +1113,18 @@ func opCallCode(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([
 	return ret, nil
 }
 
+func opDelegateCallEIP7702(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byte, error) {
+	memorySize, err := resizeMem(memoryDelegateCall, scope.Stack, scope.Memory)
+	if err != nil {
+		return nil, err
+	}
+	if err = deductDynamicGas(gasDelegateCallEIP7702, interpreter, scope, memorySize); err != nil {
+		return nil, err
+	}
+
+	return opDelegateCall(pc, interpreter, scope)
+}
+
 func opDelegateCallEIP2929(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byte, error) {
 	memorySize, err := resizeMem(memoryDelegateCall, scope.Stack, scope.Memory)
 	if err != nil {
@@ -1140,6 +1176,18 @@ func opDelegateCallHomestead(pc *uint64, interpreter *EVMInterpreter, scope *Sco
 	}
 
 	return opDelegateCall(pc, interpreter, scope)
+}
+
+func opStaticCallEIP7702(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byte, error) {
+	memorySize, err := resizeMem(memoryStaticCall, scope.Stack, scope.Memory)
+	if err != nil {
+		return nil, err
+	}
+	if err = deductDynamicGas(gasStaticCallEIP7702, interpreter, scope, memorySize); err != nil {
+		return nil, err
+	}
+
+	return opStaticCall(pc, interpreter, scope)
 }
 
 func opStaticCallByzantium(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byte, error) {
