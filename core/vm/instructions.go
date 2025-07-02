@@ -882,7 +882,7 @@ func opCreate(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]b
 	// reuse size int for stackvalue
 	stackvalue := size
 
-	scope.Contract.UseGas(gas, interpreter.evm.Config.Tracer, tracing.GasChangeCallContractCreation)
+	scope.Contract.UseGas(gas, interpreter.evm.Config.Tracer.GasChangeHook(), tracing.GasChangeCallContractCreation)
 
 	res, addr, returnGas, suberr := interpreter.evm.Create(scope.Contract.Address(), input, gas, &value)
 	// Push item on the stack based on the returned error. If the ruleset is
@@ -946,7 +946,7 @@ func opCreate2(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]
 
 	// Apply EIP150
 	gas -= gas / 64
-	scope.Contract.UseGas(gas, interpreter.evm.Config.Tracer, tracing.GasChangeCallContractCreation2)
+	scope.Contract.UseGas(gas, interpreter.evm.Config.Tracer.GasChangeHook(), tracing.GasChangeCallContractCreation2)
 	// reuse size int for stackvalue
 	stackvalue := size
 	res, addr, returnGas, suberr := interpreter.evm.Create2(scope.Contract.Address(), input, gas,

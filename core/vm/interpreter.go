@@ -218,7 +218,7 @@ func (in *EVMInterpreter) Run(contract *Contract, input []byte, readOnly bool) (
 			// associated costs.
 			contractAddr := contract.Address()
 			consumed, wanted := in.evm.TxContext.AccessEvents.CodeChunksRangeGas(contractAddr, pc, 1, uint64(len(contract.Code)), false, contract.Gas)
-			contract.UseGas(consumed, in.evm.Config.Tracer, tracing.GasChangeWitnessCodeChunk)
+			contract.UseGas(consumed, in.evm.Config.Tracer.GasChangeHook(), tracing.GasChangeWitnessCodeChunk)
 			if consumed < wanted {
 				return nil, ErrOutOfGas
 			}

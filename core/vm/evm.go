@@ -511,7 +511,7 @@ func (evm *EVM) create(caller common.Address, code []byte, gas uint64, value *ui
 	if err != nil && (evm.chainRules.IsHomestead || err != ErrCodeStoreOutOfGas) {
 		evm.StateDB.RevertToSnapshot(snapshot)
 		if err != ErrExecutionReverted {
-			contract.UseGas(contract.Gas, evm.Config.Tracer, tracing.GasChangeCallFailedExecution)
+			contract.UseGas(contract.Gas, evm.Config.Tracer.GasChangeHook(), tracing.GasChangeCallFailedExecution)
 		}
 	}
 	return ret, address, contract.Gas, err
@@ -537,12 +537,12 @@ func (evm *EVM) initNewContract(contract *Contract, address common.Address) ([]b
 
 	if !evm.chainRules.IsEIP4762 {
 		createDataGas := uint64(len(ret)) * params.CreateDataGas
-		if !contract.UseGas(createDataGas, evm.Config.Tracer, tracing.GasChangeCallCodeStorage) {
+		if !contract.UseGas(createDataGas, evm.Config.Tracer.GasChangeHook(), tracing.GasChangeCallCodeStorage) {
 			return ret, ErrCodeStoreOutOfGas
 		}
 	} else {
 		consumed, wanted := evm.AccessEvents.CodeChunksRangeGas(address, 0, uint64(len(ret)), uint64(len(ret)), true, contract.Gas)
-		contract.UseGas(consumed, evm.Config.Tracer, tracing.GasChangeWitnessCodeChunk)
+		contract.UseGas(consumed, evm.Config.Tracer.GasChangeHook(), tracing.GasChangeWitnessCodeChunk)
 		if len(ret) > 0 && (consumed < wanted) {
 			return ret, ErrCodeStoreOutOfGas
 		}

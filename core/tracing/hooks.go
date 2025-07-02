@@ -217,6 +217,14 @@ type Hooks struct {
 	OnBlockHashRead BlockHashReadHook
 }
 
+// GasChangeHook returns the OnGasChange hook if it exists
+func (h *Hooks) GasChangeHook() GasChangeHook {
+	if h != nil {
+		return h.OnGasChange
+	}
+	return nil
+}
+
 // BalanceChangeReason is used to indicate the reason for a balance change, useful
 // for tracing and reporting.
 type BalanceChangeReason byte
