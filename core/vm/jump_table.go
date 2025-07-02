@@ -308,7 +308,7 @@ func newFrontierInstructionSet() JumpTable {
 			maxStack:    maxStack(3, 1),
 		},
 		EXP: {
-			execute:  opExp,
+			execute:  opExpFrontier,
 			minStack: minStack(2, 1),
 			maxStack: maxStack(2, 1),
 		},
