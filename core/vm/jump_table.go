@@ -19,6 +19,7 @@ package vm
 import (
 	"fmt"
 
+	"github.com/ethereum/go-ethereum/core/tracing"
 	"github.com/ethereum/go-ethereum/params"
 )
 
@@ -1037,4 +1038,30 @@ func copyJumpTable(source *JumpTable) *JumpTable {
 		}
 	}
 	return &dest
+}
+
+func executeWithTracer(tracer *tracing.Hooks, execF executionFunc) executionFunc {
+	return func(pc *uint64, interpreter *EVMInterpreter, callContext *ScopeContext) ([]byte, error) {
+		pcCopy := *pc
+		op := callContext.Contract.GetOp(pcCopy)
+		operation := interpreter.table[op]
+		cost := operation.constantGas
+		gasCopy := callContext.Contract.Gas + cost
+
+		if tracer.OnGasChange != nil {
+			tracer.OnGasChange(gasCopy, gasCopy-cost, tracing.GasChangeCallOpCode)
+		}
+		if tracer.OnOpcode != nil {
+			tracer.OnOpcode(pcCopy, byte(op), gasCopy, cost, callContext, interpreter.returnData,
+				interpreter.evm.depth, nil)
+		}
+
+		ret, err := execF(pc, interpreter, callContext)
+		if err != nil {
+			if tracer.OnFault != nil {
+				tracer.OnFault(pcCopy, byte(op), gasCopy, cost, callContext, interpreter.evm.depth, VMErrorFromErr(err))
+			}
+		}
+		return ret, err
+	}
 }

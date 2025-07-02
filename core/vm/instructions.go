@@ -53,6 +53,10 @@ func deductDynamicGas(gasF gasFunc, interpreter *EVMInterpreter, scope *ScopeCon
 	} else {
 		scope.Contract.Gas -= dynamicCost
 	}
+
+	if interpreter.evm.Config.Tracer != nil && interpreter.evm.Config.Tracer.OnGasChange != nil {
+		interpreter.evm.Config.Tracer.OnGasChange(scope.Contract.Gas+dynamicCost, scope.Contract.Gas, tracing.GasChangeCallOpCodeDynamic)
+	}
 	return nil
 }
 

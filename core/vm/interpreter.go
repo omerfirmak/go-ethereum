@@ -134,7 +134,7 @@ func NewEVMInterpreter(evm *EVM) *EVMInterpreter {
 		table = &frontierInstructionSet
 	}
 	var extraEips []int
-	if len(evm.Config.ExtraEips) > 0 {
+	if len(evm.Config.ExtraEips) > 0 || evm.Config.Tracer != nil {
 		// Deep-copy jumptable to prevent modification of opcodes in other tables
 		table = copyJumpTable(table)
 	}
@@ -146,6 +146,12 @@ func NewEVMInterpreter(evm *EVM) *EVMInterpreter {
 			extraEips = append(extraEips, eip)
 		}
 	}
+	if evm.Config.Tracer != nil {
+		for _, op := range table {
+			op.execute = executeWithTracer(evm.Config.Tracer, op.execute)
+		}
+	}
+
 	evm.Config.ExtraEips = extraEips
 	return &EVMInterpreter{evm: evm, table: table, hasher: crypto.NewKeccakState()}
 }
@@ -191,12 +197,7 @@ func (in *EVMInterpreter) Run(contract *Contract, input []byte, readOnly bool) (
 		// to be uint256. Practically much less so feasible.
 		pc   = uint64(0) // program counter
 		cost uint64
-		// copies used by tracer
-		pcCopy  uint64 // needed for the deferred EVMLogger
-		gasCopy uint64 // for EVMLogger to log gas remaining before execution
-		logged  bool   // deferred EVMLogger should ignore already logged steps
-		res     []byte // result of the opcode execution function
-		debug   = in.evm.Config.Tracer != nil
+		res  []byte // result of the opcode execution function
 	)
 	// Don't move this deferred function, it's placed before the OnOpcode-deferred method,
 	// so that it gets executed _after_: the OnOpcode needs the stacks before
@@ -207,29 +208,11 @@ func (in *EVMInterpreter) Run(contract *Contract, input []byte, readOnly bool) (
 	}()
 	contract.Input = input
 
-	if debug {
-		defer func() { // this deferred method handles exit-with-error
-			if err == nil {
-				return
-			}
-			if !logged && in.evm.Config.Tracer.OnOpcode != nil {
-				in.evm.Config.Tracer.OnOpcode(pcCopy, byte(op), gasCopy, cost, callContext, in.returnData, in.evm.depth, VMErrorFromErr(err))
-			}
-			if logged && in.evm.Config.Tracer.OnFault != nil {
-				in.evm.Config.Tracer.OnFault(pcCopy, byte(op), gasCopy, cost, callContext, in.evm.depth, VMErrorFromErr(err))
-			}
-		}()
-	}
 	// The Interpreter main run loop (contextual). This loop runs until either an
 	// explicit STOP, RETURN or SELFDESTRUCT is executed, an error occurred during
 	// the execution of one of the operations or until the done flag is set by the
 	// parent context.
 	for {
-		if debug {
-			// Capture pre-execution values for tracing.
-			logged, pcCopy, gasCopy = false, pc, contract.Gas
-		}
-
 		if in.evm.chainRules.IsEIP4762 && !contract.IsDeployment && !contract.IsSystemCall {
 			// if the PC ends up in a new "chunk" of verkleized code, charge the
 			// associated costs.
@@ -259,16 +242,6 @@ func (in *EVMInterpreter) Run(contract *Contract, input []byte, readOnly bool) (
 			contract.Gas -= cost
 		}
 
-		// Do tracing before potential memory expansion
-		if debug {
-			if in.evm.Config.Tracer.OnGasChange != nil {
-				in.evm.Config.Tracer.OnGasChange(gasCopy, gasCopy-cost, tracing.GasChangeCallOpCode)
-			}
-			if in.evm.Config.Tracer.OnOpcode != nil {
-				in.evm.Config.Tracer.OnOpcode(pc, byte(op), gasCopy, cost, callContext, in.returnData, in.evm.depth, VMErrorFromErr(err))
-				logged = true
-			}
-		}
 		// execute the operation
 		res, err = operation.execute(&pc, in, callContext)
 		if err != nil {
