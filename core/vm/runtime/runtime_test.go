@@ -667,6 +667,11 @@ func TestColdAccountAccessCost(t *testing.T) {
 		Execute(tc.code, nil, &Config{
 			EVMConfig: vm.Config{
 				Tracer: &tracing.Hooks{
+					OnGasChange: func(old, new uint64, reason tracing.GasChangeReason) {
+						if step-1 == tc.step && reason == tracing.GasChangeCallOpCodeDynamic {
+							have += old - new
+						}
+					},
 					OnOpcode: func(pc uint64, op byte, gas, cost uint64, scope tracing.OpContext, rData []byte, depth int, err error) {
 						// Uncomment to investigate failures:
 						//t.Logf("%d: %v %d", step, vm.OpCode(op).String(), cost)
