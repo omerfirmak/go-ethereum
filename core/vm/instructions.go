@@ -36,7 +36,6 @@ func resizeMem(memF memorySizeFunc, stack *Stack, mem *Memory) (uint64, error) {
 		return 0, ErrGasUintOverflow
 	}
 	memorySize := ((memSize + 31) / 32) * 32
-	mem.Resize(memorySize)
 	return memorySize, nil
 }
 
@@ -57,6 +56,7 @@ func deductDynamicGas(gasF gasFunc, interpreter *EVMInterpreter, scope *ScopeCon
 	if interpreter.evm.Config.Tracer != nil && interpreter.evm.Config.Tracer.OnGasChange != nil {
 		interpreter.evm.Config.Tracer.OnGasChange(scope.Contract.Gas+dynamicCost, scope.Contract.Gas, tracing.GasChangeCallOpCodeDynamic)
 	}
+	scope.Memory.Resize(memorySize)
 	return nil
 }
 
