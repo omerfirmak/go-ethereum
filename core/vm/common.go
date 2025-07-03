@@ -26,11 +26,11 @@ import (
 // calcMemSize64 calculates the required memory size, and returns
 // the size and whether the result overflowed uint64
 func calcMemSize64(off, len *uint256.Int) (uint64, bool) {
-	overflowed := (len[1] | len[2] | len[3] | off[1] | off[2] | off[3]) != 0
 	// if length is zero, memsize is always zero, regardless of offset
 	if len[0] == 0 {
-		return 0, overflowed
+		return 0, false
 	}
+	overflowed := (len[1] | len[2] | len[3] | off[1] | off[2] | off[3]) != 0
 	memSize := off[0] + len[0]
 	// if value < either of it's parts, then it overflowed
 	return memSize, overflowed || memSize < off[0]
