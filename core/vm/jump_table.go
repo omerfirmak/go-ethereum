@@ -1058,7 +1058,7 @@ func executeWithTracer(tracer *tracing.Hooks, execF executionFunc) executionFunc
 
 		ret, err := execF(pc, interpreter, callContext)
 		if err != nil {
-			if tracer.OnFault != nil {
+			if tracer.OnOpcode == nil && tracer.OnFault != nil {
 				tracer.OnFault(pcCopy, byte(op), gasCopy, cost, callContext, interpreter.evm.depth, VMErrorFromErr(err))
 			}
 		}
