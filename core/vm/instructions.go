@@ -1484,17 +1484,6 @@ func opStaticCallEIP2929(pc *uint64, interpreter *EVMInterpreter, scope *ScopeCo
 	return opStaticCall(pc, interpreter, scope)
 }
 
-/*
-	jt[DELEGATECALL] = &operation{
-		execute:    opDelegateCall,
-		dynamicGas: gasDelegateCallEIP4762,
-		minStack:   minStack(6, 1),
-		maxStack:   maxStack(6, 1),
-		memorySize: memoryDelegateCall,
-	}
-
-*/
-
 func opStaticCallEIP4762(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byte, error) {
 	memorySize, err := calculateMemorySize(memoryStaticCall, scope.Stack, scope.Memory)
 	if err != nil {
