@@ -261,13 +261,18 @@ func enable5656(jt *JumpTable) {
 
 // opMcopy implements the MCOPY opcode (https://eips.ethereum.org/EIPS/eip-5656)
 func opMcopy(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byte, error) {
-	memorySize, err := resizeMem(memoryMcopy, scope.Stack, scope.Memory)
+	memorySize, err := calculateMemorySize(memoryMcopy, scope.Stack, scope.Memory)
 	if err != nil {
 		return nil, err
 	}
-	if err = deductDynamicGas(gasMcopy, interpreter, scope, memorySize); err != nil {
+	dynamicCost, err := gasMcopy(interpreter.evm, scope.Contract, scope.Stack, scope.Memory, memorySize)
+	if err != nil {
 		return nil, err
 	}
+	if !scope.Contract.UseGas(dynamicCost, interpreter.evm.Config.Tracer.GasChangeHook(), tracing.GasChangeCallOpCodeDynamic) {
+		return nil, ErrOutOfGas
+	}
+	scope.Memory.Resize(memorySize)
 
 	var (
 		dst    = scope.Stack.pop()
