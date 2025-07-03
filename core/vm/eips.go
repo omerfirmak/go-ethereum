@@ -267,7 +267,7 @@ func opMcopy(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]by
 	}
 	dynamicCost, err := gasMcopy(interpreter.evm, scope.Contract, scope.Stack, scope.Memory, memorySize)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("%w: %v", ErrOutOfGas, err)
 	}
 	if !scope.Contract.UseGas(dynamicCost, interpreter.evm.Config.Tracer.GasChangeHook(), tracing.GasChangeCallOpCodeDynamic) {
 		return nil, ErrOutOfGas
