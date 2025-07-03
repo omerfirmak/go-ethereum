@@ -445,7 +445,7 @@ func newFrontierInstructionSet() JumpTable {
 			maxStack:    maxStack(0, 1),
 		},
 		CODECOPY: {
-			execute:     opCodeCopy,
+			execute:     opCodeCopyFrontier,
 			constantGas: GasFastestStep,
 			minStack:    minStack(3, 0),
 			maxStack:    maxStack(3, 0),
