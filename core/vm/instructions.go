@@ -40,16 +40,6 @@ func calculateMemorySize(memF memorySizeFunc, stack *Stack, mem *Memory) (uint64
 	return memorySize, nil
 }
 
-// calculateDynamicGas calculates the required dynamic
-// it is important that this function is inlinable
-func calculateDynamicGas(gasF gasFunc, evm *EVM, contract *Contract, stack *Stack, mem *Memory, memorySize uint64) (uint64, error) {
-	dynamicGas, err := gasF(evm, contract, stack, mem, memorySize)
-	if err != nil {
-		return 0, fmt.Errorf("%w: %v", ErrOutOfGas, err)
-	}
-	return dynamicGas, nil
-}
-
 func opAdd(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byte, error) {
 	x, y := scope.Stack.pop(), scope.Stack.peek()
 	y.Add(&x, y)
