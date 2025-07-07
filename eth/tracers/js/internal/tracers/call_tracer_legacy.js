@@ -24,6 +24,9 @@
 	// an inner call.
 	descended: false,
 
+	// keeps track of last pushed call to attribute the next dynamic cost with
+	lastPushedCall: undefined,
+
 	// step is invoked for every opcode that the VM executes.
 	step: function(log, db) {
 		// Capture any errors immediately
@@ -52,6 +55,7 @@
 				value:   '0x' + log.stack.peek(0).toString(16)
 			};
 			this.callstack.push(call);
+			this.lastPushedCall = call
 			this.descended = true
 			return;
 		}
@@ -61,14 +65,16 @@
 			if (this.callstack[left-1].calls === undefined) {
 				this.callstack[left-1].calls = [];
 			}
-			this.callstack[left-1].calls.push({
-				type:    op,
-				from:    toHex(log.contract.getAddress()),
-				to:      toHex(toAddress(log.stack.peek(0).toString(16))),
-				gasIn:   log.getGas(),
+			var call = {
+				type: op,
+				from: toHex(log.contract.getAddress()),
+				to: toHex(toAddress(log.stack.peek(0).toString(16))),
+				gasIn: log.getGas(),
 				gasCost: log.getCost(),
-				value:   '0x' + db.getBalance(log.contract.getAddress()).toString(16)
-			});
+				value: '0x' + db.getBalance(log.contract.getAddress()).toString(16)
+			}
+			this.callstack[left - 1].calls.push(call);
+			this.lastPushedCall = call
 			return
 		}
 		// If a new method invocation is being done, add to the call stack
@@ -98,6 +104,7 @@
 				call.value = '0x' + log.stack.peek(2).toString(16);
 			}
 			this.callstack.push(call);
+			this.lastPushedCall = call
 			this.descended = true
 			return;
 		}
@@ -158,6 +165,13 @@
 				this.callstack[left-1].calls = [];
 			}
 			this.callstack[left-1].calls.push(call);
+		}
+	},
+
+	gas: function(change) {
+		if (this.lastPushedCall !== undefined && change.getReason() == "CallOpCodeDynamic") {
+			this.lastPushedCall.gasCost += change.getOld() - change.getNew();
+			this.lastPushedCall = undefined
 		}
 	},
 
