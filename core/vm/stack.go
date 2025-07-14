@@ -27,7 +27,7 @@ import (
 
 var stackPool = sync.Pool{
 	New: func() interface{} {
-		return &Stack{data: make([]uint256.Int, 0, 16)}
+		return &Stack{data: make([]uint256.Int, 0, 1024)}
 	},
 }
 
@@ -59,6 +59,15 @@ func (st *Stack) len() int {
 func (st *Stack) growUnsafeByN(n uint) {
 	sh := (*reflect.SliceHeader)(unsafe.Pointer(&st.data))
 	sh.Len += int(n)
+}
+
+func (st *Stack) reserve() (*uint256.Int, error) {
+	if uint64(st.len()) >= params.StackLimit {
+		return nil, ErrStackOverflow{st.len(), int(params.StackLimit)}
+	}
+	st.growUnsafeByN(1)
+	offset := unsafe.Sizeof(uint256.Int{}) * uintptr(st.len()-1)
+	return (*uint256.Int)(unsafe.Add(unsafe.Pointer(unsafe.SliceData(st.data)), offset)), nil
 }
 
 func (st *Stack) push(d *uint256.Int) error {

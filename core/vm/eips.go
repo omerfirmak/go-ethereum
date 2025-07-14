@@ -104,8 +104,12 @@ func enable1344(jt *JumpTable) {
 
 // opChainID implements CHAINID opcode
 func opChainID(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byte, error) {
-	chainId, _ := uint256.FromBig(interpreter.evm.chainConfig.ChainID)
-	return nil, scope.Stack.push(chainId)
+	id, err := scope.Stack.reserve()
+	if err != nil {
+		return nil, err
+	}
+	id.SetFromBig(interpreter.evm.chainConfig.ChainID)
+	return nil, nil
 }
 
 // enable2200 applies EIP-2200 (Rebalance net-metered SSTORE)
@@ -215,8 +219,12 @@ func opTstore(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]b
 
 // opBaseFee implements BASEFEE opcode
 func opBaseFee(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byte, error) {
-	baseFee, _ := uint256.FromBig(interpreter.evm.Context.BaseFee)
-	return nil, scope.Stack.push(baseFee)
+	fee, err := scope.Stack.reserve()
+	if err != nil {
+		return nil, err
+	}
+	fee.SetFromBig(interpreter.evm.Context.BaseFee)
+	return nil, nil
 }
 
 // enable3855 applies EIP-3855 (PUSH0 opcode)
@@ -297,8 +305,12 @@ func opBlobHash(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([
 
 // opBlobBaseFee implements BLOBBASEFEE opcode
 func opBlobBaseFee(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byte, error) {
-	blobBaseFee, _ := uint256.FromBig(interpreter.evm.Context.BlobBaseFee)
-	return nil, scope.Stack.push(blobBaseFee)
+	fee, err := scope.Stack.reserve()
+	if err != nil {
+		return nil, err
+	}
+	fee.SetFromBig(interpreter.evm.Context.BlobBaseFee)
+	return nil, nil
 }
 
 // opCLZ implements the CLZ opcode (count leading zero bytes)
@@ -384,16 +396,15 @@ func opExtCodeCopyEIP4762(pc *uint64, interpreter *EVMInterpreter, scope *ScopeC
 // need not worry about the adjusted bound logic when adding the PUSHDATA to
 // the list of access events.
 func opPush1EIP4762(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byte, error) {
-	var (
-		codeLen = uint64(len(scope.Contract.Code))
-		integer = new(uint256.Int)
-	)
+	var codeLen = uint64(len(scope.Contract.Code))
 	*pc += 1
-	if *pc < codeLen {
-		if err := scope.Stack.push(integer.SetUint64(uint64(scope.Contract.Code[*pc]))); err != nil {
-			return nil, err
-		}
+	elem, err := scope.Stack.reserve()
+	if err != nil {
+		return nil, err
+	}
 
+	if *pc < codeLen {
+		elem.SetUint64(uint64(scope.Contract.Code[*pc]))
 		if !scope.Contract.IsDeployment && !scope.Contract.IsSystemCall && *pc%31 == 0 {
 			// touch next chunk if PUSH1 is at the boundary. if so, *pc has
 			// advanced past this boundary.
@@ -406,7 +417,8 @@ func opPush1EIP4762(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext
 		}
 		return nil, nil
 	}
-	return nil, scope.Stack.push(integer.Clear())
+	elem.Clear()
+	return nil, nil
 }
 
 func makePushEIP4762(size uint64, pushByteSize int) executionFunc {
@@ -416,15 +428,12 @@ func makePushEIP4762(size uint64, pushByteSize int) executionFunc {
 			start   = min(codeLen, int(*pc+1))
 			end     = min(codeLen, start+pushByteSize)
 		)
-		if err := scope.Stack.push(new(uint256.Int).SetBytes(
-			common.RightPadBytes(
-				scope.Contract.Code[start:end],
-				pushByteSize,
-			)),
-		); err != nil {
+		elem, err := scope.Stack.reserve()
+		if err != nil {
 			return nil, err
 		}
 
+		elem.SetBytes(common.RightPadBytes(scope.Contract.Code[start:end], pushByteSize))
 		if !scope.Contract.IsDeployment && !scope.Contract.IsSystemCall {
 			contractAddr := scope.Contract.Address()
 			consumed, wanted := interpreter.evm.AccessEvents.CodeChunksRangeGas(contractAddr, uint64(start), uint64(pushByteSize), uint64(len(scope.Contract.Code)), false, scope.Contract.Gas)
