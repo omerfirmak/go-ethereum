@@ -190,6 +190,7 @@ func NewWithReader(root common.Hash, db Database, reader Reader) (*StateDB, erro
 		transientStorage:     newTransientStorage(),
 		allocator:            &trie.ArenaNodeAllocator{},
 	}
+	trie.ArenaAlloc.Mark(1)
 	if db.TrieDB().IsVerkle() {
 		sdb.accessEvents = NewAccessEvents(db.PointCache())
 	}

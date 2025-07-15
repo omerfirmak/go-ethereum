@@ -1,6 +1,21 @@
 package trie
 
-import "sync"
+import (
+	"sync"
+	"unsafe"
+
+	"github.com/ethereum/go-ethereum/metrics"
+)
+
+var ArenaAlloc = metrics.NewRegisteredMeter("arenaAlloc", nil)
+var ArenaFree = metrics.NewRegisteredMeter("arenaFree", nil)
+
+var ShortPageAlloc = metrics.NewRegisteredMeter("arena/shortpagealloc", nil)
+var FullPageAlloc = metrics.NewRegisteredMeter("arena/fullpagealloc", nil)
+var BytePageAlloc = metrics.NewRegisteredMeter("arena/bytepagealloc", nil)
+var ShortPagePut = metrics.NewRegisteredMeter("arena/shortpageput", nil)
+var FullPagePut = metrics.NewRegisteredMeter("arena/fullpageput", nil)
+var BytePagePut = metrics.NewRegisteredMeter("arena/bytepageput", nil)
 
 type NodeAllocator interface {
 	//
@@ -45,18 +60,21 @@ const arenaPageSize = 1024
 
 var shortsPagePool = sync.Pool{
 	New: func() any {
+		ShortPageAlloc.Mark(int64(unsafe.Sizeof(shortNode{}) * 1024))
 		return make([]shortNode, arenaPageSize)
 	},
 }
 
 var fullsPagePool = sync.Pool{
 	New: func() any {
+		FullPageAlloc.Mark(int64(unsafe.Sizeof(fullNode{}) * 1024))
 		return make([]fullNode, arenaPageSize)
 	},
 }
 
 var bytesPagePool = sync.Pool{
 	New: func() any {
+		BytePageAlloc.Mark(1024)
 		return make([]byte, arenaPageSize)
 	},
 }
@@ -112,6 +130,7 @@ func (a *ArenaNodeAllocator) NewBytes(requestLen int) []byte {
 }
 
 func (a *ArenaNodeAllocator) Copy() NodeAllocator {
+	ArenaAlloc.Mark(1)
 	childArena := &ArenaNodeAllocator{}
 	a.children = append(a.children, childArena)
 	return childArena
@@ -124,15 +143,19 @@ func (a *ArenaNodeAllocator) Reset() {
 }
 
 func (a *ArenaNodeAllocator) Free() {
+	ArenaFree.Mark(1)
 	for _, page := range a.shorts {
+		ShortPagePut.Mark(int64(unsafe.Sizeof(shortNode{}) * 1024))
 		shortsPagePool.Put(page)
 	}
 	a.shorts = nil
 	for _, page := range a.fulls {
+		FullPagePut.Mark(int64(unsafe.Sizeof(fullNode{}) * 1024))
 		fullsPagePool.Put(page)
 	}
 	a.fulls = nil
 	for _, page := range a.bytes {
+		BytePagePut.Mark(int64(1024))
 		bytesPagePool.Put(page)
 	}
 	a.bytes = nil
