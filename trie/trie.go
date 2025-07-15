@@ -81,13 +81,9 @@ func (t *Trie) Copy() *Trie {
 	}
 }
 
-// New creates the trie instance with provided trie id and the read-only
-// database. The state specified by trie id must be available, otherwise
-// an error will be returned. The trie root specified by trie id can be
-// zero hash or the sha3 hash of an empty string, then trie is initially
-// empty, otherwise, the root node must be present in database or returns
-// a MissingNodeError if not.
-func New(id *ID, db database.NodeDatabase) (*Trie, error) {
+// NewWithAllocator creates a trie instance with provided trie id and the read-only
+// database and the allocator
+func NewWithAllocator(id *ID, db database.NodeDatabase, allocator NodeAllocator) (*Trie, error) {
 	reader, err := newTrieReader(id.StateRoot, id.Owner, db)
 	if err != nil {
 		return nil, err
@@ -96,7 +92,7 @@ func New(id *ID, db database.NodeDatabase) (*Trie, error) {
 		owner:     id.Owner,
 		reader:    reader,
 		tracer:    newTracer(),
-		allocator: GcNodeAllocator{},
+		allocator: allocator,
 	}
 	if id.Root != (common.Hash{}) && id.Root != types.EmptyRootHash {
 		rootnode, err := trie.resolveAndTrack(id.Root[:], nil)
@@ -106,6 +102,16 @@ func New(id *ID, db database.NodeDatabase) (*Trie, error) {
 		trie.root = rootnode
 	}
 	return trie, nil
+}
+
+// New creates the trie instance with provided trie id and the read-only
+// database. The state specified by trie id must be available, otherwise
+// an error will be returned. The trie root specified by trie id can be
+// zero hash or the sha3 hash of an empty string, then trie is initially
+// empty, otherwise, the root node must be present in database or returns
+// a MissingNodeError if not.
+func New(id *ID, db database.NodeDatabase) (*Trie, error) {
+	return NewWithAllocator(id, db, GcNodeAllocator{})
 }
 
 // NewEmpty is a shortcut to create empty tree. It's mostly used in tests.

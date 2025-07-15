@@ -32,6 +32,7 @@ import (
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/rlp"
+	"github.com/ethereum/go-ethereum/trie"
 	"github.com/ethereum/go-ethereum/triedb"
 )
 
@@ -368,7 +369,7 @@ func (bc *BlockChain) TxIndexDone() bool {
 
 // HasState checks if state trie is fully present in the database or not.
 func (bc *BlockChain) HasState(hash common.Hash) bool {
-	_, err := bc.statedb.OpenTrie(hash)
+	_, err := bc.statedb.OpenTrie(hash, trie.GcNodeAllocator{})
 	return err == nil
 }
 

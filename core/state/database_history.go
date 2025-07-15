@@ -25,6 +25,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/rlp"
+	"github.com/ethereum/go-ethereum/trie"
 	"github.com/ethereum/go-ethereum/trie/utils"
 	"github.com/ethereum/go-ethereum/triedb"
 	"github.com/ethereum/go-ethereum/triedb/pathdb"
@@ -129,13 +130,13 @@ func (db *HistoricDB) Reader(stateRoot common.Hash) (Reader, error) {
 }
 
 // OpenTrie opens the main account trie. It's not supported by historic database.
-func (db *HistoricDB) OpenTrie(root common.Hash) (Trie, error) {
+func (db *HistoricDB) OpenTrie(root common.Hash, _ trie.NodeAllocator) (Trie, error) {
 	return nil, errors.New("not implemented")
 }
 
 // OpenStorageTrie opens the storage trie of an account. It's not supported by
 // historic database.
-func (db *HistoricDB) OpenStorageTrie(stateRoot common.Hash, address common.Address, root common.Hash, trie Trie) (Trie, error) {
+func (db *HistoricDB) OpenStorageTrie(stateRoot common.Hash, address common.Address, root common.Hash, trie Trie, _ trie.NodeAllocator) (Trie, error) {
 	return nil, errors.New("not implemented")
 }
 

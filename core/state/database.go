@@ -49,10 +49,10 @@ type Database interface {
 	Reader(root common.Hash) (Reader, error)
 
 	// OpenTrie opens the main account trie.
-	OpenTrie(root common.Hash) (Trie, error)
+	OpenTrie(root common.Hash, allocator trie.NodeAllocator) (Trie, error)
 
 	// OpenStorageTrie opens the storage trie of an account.
-	OpenStorageTrie(stateRoot common.Hash, address common.Address, root common.Hash, trie Trie) (Trie, error)
+	OpenStorageTrie(stateRoot common.Hash, address common.Address, root common.Hash, trie Trie, allocator trie.NodeAllocator) (Trie, error)
 
 	// PointCache returns the cache holding points used in verkle tree key computation
 	PointCache() *utils.PointCache
@@ -222,11 +222,11 @@ func (db *CachingDB) ReadersWithCacheStats(stateRoot common.Hash) (ReaderWithSta
 }
 
 // OpenTrie opens the main account trie at a specific root hash.
-func (db *CachingDB) OpenTrie(root common.Hash) (Trie, error) {
+func (db *CachingDB) OpenTrie(root common.Hash, allocator trie.NodeAllocator) (Trie, error) {
 	if db.triedb.IsVerkle() {
 		return trie.NewVerkleTrie(root, db.triedb, db.pointCache)
 	}
-	tr, err := trie.NewStateTrie(trie.StateTrieID(root), db.triedb)
+	tr, err := trie.NewStateTrieWithAllocator(trie.StateTrieID(root), db.triedb, allocator)
 	if err != nil {
 		return nil, err
 	}
@@ -234,14 +234,14 @@ func (db *CachingDB) OpenTrie(root common.Hash) (Trie, error) {
 }
 
 // OpenStorageTrie opens the storage trie of an account.
-func (db *CachingDB) OpenStorageTrie(stateRoot common.Hash, address common.Address, root common.Hash, self Trie) (Trie, error) {
+func (db *CachingDB) OpenStorageTrie(stateRoot common.Hash, address common.Address, root common.Hash, self Trie, allocator trie.NodeAllocator) (Trie, error) {
 	// In the verkle case, there is only one tree. But the two-tree structure
 	// is hardcoded in the codebase. So we need to return the same trie in this
 	// case.
 	if db.triedb.IsVerkle() {
 		return self, nil
 	}
-	tr, err := trie.NewStateTrie(trie.StorageTrieID(stateRoot, crypto.Keccak256Hash(address.Bytes()), root), db.triedb)
+	tr, err := trie.NewStateTrieWithAllocator(trie.StorageTrieID(stateRoot, crypto.Keccak256Hash(address.Bytes()), root), db.triedb, allocator)
 	if err != nil {
 		return nil, err
 	}

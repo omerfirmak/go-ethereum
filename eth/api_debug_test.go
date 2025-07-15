@@ -37,6 +37,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/params"
+	"github.com/ethereum/go-ethereum/trie"
 	"github.com/ethereum/go-ethereum/triedb"
 	"github.com/holiman/uint256"
 	"github.com/stretchr/testify/assert"
@@ -133,7 +134,7 @@ func TestAccountRange(t *testing.T) {
 	root, _ := sdb.Commit(0, true, false)
 	sdb, _ = state.New(root, statedb)
 
-	trie, err := statedb.OpenTrie(root)
+	trie, err := statedb.OpenTrie(root, trie.GcNodeAllocator{})
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -138,6 +138,9 @@ type StateDB struct {
 	// State witness if cross validation is needed
 	witness *stateless.Witness
 
+	// Trie Node Allocator
+	allocator *trie.ArenaNodeAllocator
+
 	// Measurements gathered during execution for debugging purposes
 	AccountReads    time.Duration
 	AccountHashes   time.Duration
@@ -155,6 +158,10 @@ type StateDB struct {
 	StorageLoaded  int          // Number of storage slots retrieved from the database during the state transition
 	StorageUpdated atomic.Int64 // Number of storage slots updated during the state transition
 	StorageDeleted atomic.Int64 // Number of storage slots deleted during the state transition
+}
+
+func (s *StateDB) FreeAllocator() {
+	s.allocator.Free()
 }
 
 // New creates a new state from a given trie.
@@ -181,6 +188,7 @@ func NewWithReader(root common.Hash, db Database, reader Reader) (*StateDB, erro
 		journal:              newJournal(),
 		accessList:           newAccessList(),
 		transientStorage:     newTransientStorage(),
+		allocator:            &trie.ArenaNodeAllocator{},
 	}
 	if db.TrieDB().IsVerkle() {
 		sdb.accessEvents = NewAccessEvents(db.PointCache())
@@ -207,7 +215,7 @@ func (s *StateDB) StartPrefetcher(namespace string, witness *stateless.Witness) 
 	// To prevent this, the account trie is always scheduled for prefetching once
 	// the prefetcher is constructed. For more details, see:
 	// https://github.com/ethereum/go-ethereum/issues/29880
-	s.prefetcher = newTriePrefetcher(s.db, s.originalRoot, namespace, witness == nil)
+	s.prefetcher = newTriePrefetcher(s.db, s.originalRoot, s.allocator, namespace, witness == nil)
 	if err := s.prefetcher.prefetch(common.Hash{}, s.originalRoot, common.Address{}, nil, nil, false); err != nil {
 		log.Error("Failed to prefetch account trie", "root", s.originalRoot, "err", err)
 	}
@@ -690,6 +698,7 @@ func (s *StateDB) Copy() *StateDB {
 		accessList:       s.accessList.Copy(),
 		transientStorage: s.transientStorage.Copy(),
 		journal:          s.journal.copy(),
+		allocator:        s.allocator.Copy().(*trie.ArenaNodeAllocator),
 	}
 	if s.trie != nil {
 		state.trie = mustCopyTrie(s.trie)
@@ -796,7 +805,7 @@ func (s *StateDB) IntermediateRoot(deleteEmptyObjects bool) common.Hash {
 	// This operation must be done before state object storage hashing,
 	// as it assumes the main trie is already loaded.
 	if s.trie == nil {
-		tr, err := s.db.OpenTrie(s.originalRoot)
+		tr, err := s.db.OpenTrie(s.originalRoot, s.allocator)
 		if err != nil {
 			s.setError(err)
 			return common.Hash{}
@@ -1005,7 +1014,7 @@ func (s *StateDB) fastDeleteStorage(snaps *snapshot.Tree, addrHash common.Hash, 
 // employed when the associated state snapshot is not available. It iterates the
 // storage slots along with all internal trie nodes via trie directly.
 func (s *StateDB) slowDeleteStorage(addr common.Address, addrHash common.Hash, root common.Hash) (map[common.Hash][]byte, map[common.Hash][]byte, *trienode.NodeSet, error) {
-	tr, err := s.db.OpenStorageTrie(s.originalRoot, addr, root, s.trie)
+	tr, err := s.db.OpenStorageTrie(s.originalRoot, addr, root, s.trie, s.allocator.Copy())
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to open storage trie, err: %w", err)
 	}

@@ -77,7 +77,7 @@ func (it *nodeIterator) step() error {
 		return nil
 	}
 	if it.tr == nil {
-		tr, err := it.state.db.OpenTrie(it.state.originalRoot)
+		tr, err := it.state.db.OpenTrie(it.state.originalRoot, it.state.allocator.Copy())
 		if err != nil {
 			return err
 		}
@@ -131,7 +131,7 @@ func (it *nodeIterator) step() error {
 	address := common.BytesToAddress(preimage)
 
 	// Traverse the storage slots belong to the account
-	dataTrie, err := it.state.db.OpenStorageTrie(it.state.originalRoot, address, account.Root, it.tr)
+	dataTrie, err := it.state.db.OpenStorageTrie(it.state.originalRoot, address, account.Root, it.tr, it.state.allocator.Copy())
 	if err != nil {
 		return err
 	}

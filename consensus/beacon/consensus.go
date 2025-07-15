@@ -387,7 +387,7 @@ func (beacon *Beacon) FinalizeAndAssemble(chain consensus.ChainHeaderReader, hea
 		if parent == nil {
 			return nil, fmt.Errorf("nil parent header for block %d", header.Number)
 		}
-		preTrie, err := state.Database().OpenTrie(parent.Root)
+		preTrie, err := state.Database().OpenTrie(parent.Root, trie.GcNodeAllocator{})
 		if err != nil {
 			return nil, fmt.Errorf("error opening pre-state tree root: %w", err)
 		}

@@ -1956,6 +1956,11 @@ func (bc *BlockChain) processBlock(parentRoot common.Hash, block *types.Block, s
 		statedb   *state.StateDB
 		interrupt atomic.Bool
 	)
+	defer func() {
+		if statedb != nil {
+			statedb.FreeAllocator()
+		}
+	}()
 	defer interrupt.Store(true) // terminate the prefetch at the end
 
 	if bc.cfg.NoPrefetch {
@@ -2005,6 +2010,7 @@ func (bc *BlockChain) processBlock(parentRoot common.Hash, block *types.Block, s
 			if interrupt.Load() {
 				blockPrefetchInterruptMeter.Mark(1)
 			}
+			throwaway.FreeAllocator()
 		}(time.Now(), throwaway, block)
 	}
 

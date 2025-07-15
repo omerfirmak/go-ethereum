@@ -76,10 +76,16 @@ type StateTrie struct {
 // trie is initially empty. Otherwise, New will panic if db is nil
 // and returns MissingNodeError if the root node cannot be found.
 func NewStateTrie(id *ID, db database.NodeDatabase) (*StateTrie, error) {
+	return NewStateTrieWithAllocator(id, db, GcNodeAllocator{})
+}
+
+// NewStateTrieWithAllocator creates a trie with an existing root node
+// from a backing database.
+func NewStateTrieWithAllocator(id *ID, db database.NodeDatabase, allocator NodeAllocator) (*StateTrie, error) {
 	if db == nil {
 		panic("trie.NewStateTrie called without a database")
 	}
-	trie, err := New(id, db)
+	trie, err := NewWithAllocator(id, db, allocator)
 	if err != nil {
 		return nil, err
 	}

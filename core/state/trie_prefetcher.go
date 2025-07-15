@@ -23,6 +23,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/metrics"
+	"github.com/ethereum/go-ethereum/trie"
 )
 
 var (
@@ -40,12 +41,13 @@ var (
 //
 // Note, the prefetcher's API is not thread safe.
 type triePrefetcher struct {
-	verkle   bool                   // Flag whether the prefetcher is in verkle mode
-	db       Database               // Database to fetch trie nodes through
-	root     common.Hash            // Root hash of the account trie for metrics
-	fetchers map[string]*subfetcher // Subfetchers for each trie
-	term     chan struct{}          // Channel to signal interruption
-	noreads  bool                   // Whether to ignore state-read-only prefetch requests
+	verkle    bool                     // Flag whether the prefetcher is in verkle mode
+	db        Database                 // Database to fetch trie nodes through
+	root      common.Hash              // Root hash of the account trie for metrics
+	fetchers  map[string]*subfetcher   // Subfetchers for each trie
+	term      chan struct{}            // Channel to signal interruption
+	noreads   bool                     // Whether to ignore state-read-only prefetch requests
+	allocator *trie.ArenaNodeAllocator //
 
 	deliveryMissMeter *metrics.Meter
 
@@ -64,15 +66,16 @@ type triePrefetcher struct {
 	storageWasteMeter     *metrics.Meter
 }
 
-func newTriePrefetcher(db Database, root common.Hash, namespace string, noreads bool) *triePrefetcher {
+func newTriePrefetcher(db Database, root common.Hash, allocator *trie.ArenaNodeAllocator, namespace string, noreads bool) *triePrefetcher {
 	prefix := triePrefetchMetricsPrefix + namespace
 	return &triePrefetcher{
-		verkle:   db.TrieDB().IsVerkle(),
-		db:       db,
-		root:     root,
-		fetchers: make(map[string]*subfetcher), // Active prefetchers use the fetchers map
-		term:     make(chan struct{}),
-		noreads:  noreads,
+		verkle:    db.TrieDB().IsVerkle(),
+		db:        db,
+		root:      root,
+		fetchers:  make(map[string]*subfetcher), // Active prefetchers use the fetchers map
+		term:      make(chan struct{}),
+		noreads:   noreads,
+		allocator: allocator,
 
 		deliveryMissMeter: metrics.GetOrRegisterMeter(prefix+"/deliverymiss", nil),
 
@@ -172,7 +175,7 @@ func (p *triePrefetcher) prefetch(owner common.Hash, root common.Hash, addr comm
 	id := p.trieID(owner, root)
 	fetcher := p.fetchers[id]
 	if fetcher == nil {
-		fetcher = newSubfetcher(p.db, p.root, owner, root, addr)
+		fetcher = newSubfetcher(p.db, p.root, owner, root, addr, p.allocator)
 		p.fetchers[id] = fetcher
 	}
 	return fetcher.schedule(addrs, slots, read)
@@ -223,15 +226,15 @@ func (p *triePrefetcher) trieID(owner common.Hash, root common.Hash) string {
 // main prefetcher is paused and either all requested items are processed or if
 // the trie being worked on is retrieved from the prefetcher.
 type subfetcher struct {
-	db    Database       // Database to load trie nodes through
-	state common.Hash    // Root hash of the state to prefetch
-	owner common.Hash    // Owner of the trie, usually account hash
-	root  common.Hash    // Root hash of the trie to prefetch
-	addr  common.Address // Address of the account that the trie belongs to
-	trie  Trie           // Trie being populated with nodes
-
-	tasks []*subfetcherTask // Items queued up for retrieval
-	lock  sync.Mutex        // Lock protecting the task queue
+	db        Database                 // Database to load trie nodes through
+	state     common.Hash              // Root hash of the state to prefetch
+	owner     common.Hash              // Owner of the trie, usually account hash
+	root      common.Hash              // Root hash of the trie to prefetch
+	addr      common.Address           // Address of the account that the trie belongs to
+	trie      Trie                     // Trie being populated with nodes
+	allocator *trie.ArenaNodeAllocator //
+	tasks     []*subfetcherTask        // Items queued up for retrieval
+	lock      sync.Mutex               // Lock protecting the task queue
 
 	wake chan struct{} // Wake channel if a new task is scheduled
 	stop chan struct{} // Channel to interrupt processing
@@ -260,13 +263,14 @@ type subfetcherTask struct {
 
 // newSubfetcher creates a goroutine to prefetch state items belonging to a
 // particular root hash.
-func newSubfetcher(db Database, state common.Hash, owner common.Hash, root common.Hash, addr common.Address) *subfetcher {
+func newSubfetcher(db Database, state common.Hash, owner common.Hash, root common.Hash, addr common.Address, allocator *trie.ArenaNodeAllocator) *subfetcher {
 	sf := &subfetcher{
 		db:            db,
 		state:         state,
 		owner:         owner,
 		root:          root,
 		addr:          addr,
+		allocator:     allocator,
 		wake:          make(chan struct{}, 1),
 		stop:          make(chan struct{}),
 		term:          make(chan struct{}),
@@ -343,7 +347,7 @@ func (sf *subfetcher) openTrie() error {
 	// Open the verkle tree if the sub-fetcher is in verkle mode. Note, there is
 	// only a single fetcher for verkle.
 	if sf.db.TrieDB().IsVerkle() {
-		tr, err := sf.db.OpenTrie(sf.state)
+		tr, err := sf.db.OpenTrie(sf.state, sf.allocator.Copy())
 		if err != nil {
 			log.Warn("Trie prefetcher failed opening verkle trie", "root", sf.root, "err", err)
 			return err
@@ -353,7 +357,7 @@ func (sf *subfetcher) openTrie() error {
 	}
 	// Open the merkle tree if the sub-fetcher is in merkle mode
 	if sf.owner == (common.Hash{}) {
-		tr, err := sf.db.OpenTrie(sf.state)
+		tr, err := sf.db.OpenTrie(sf.state, sf.allocator.Copy())
 		if err != nil {
 			log.Warn("Trie prefetcher failed opening account trie", "root", sf.root, "err", err)
 			return err
@@ -361,7 +365,7 @@ func (sf *subfetcher) openTrie() error {
 		sf.trie = tr
 		return nil
 	}
-	tr, err := sf.db.OpenStorageTrie(sf.state, sf.addr, sf.root, nil)
+	tr, err := sf.db.OpenStorageTrie(sf.state, sf.addr, sf.root, nil, sf.allocator.Copy())
 	if err != nil {
 		log.Warn("Trie prefetcher failed opening storage trie", "root", sf.root, "err", err)
 		return err

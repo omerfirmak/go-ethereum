@@ -26,6 +26,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/internal/testrand"
+	"github.com/ethereum/go-ethereum/trie"
 	"github.com/ethereum/go-ethereum/triedb"
 	"github.com/holiman/uint256"
 )
@@ -50,7 +51,7 @@ func filledStateDB() *StateDB {
 
 func TestUseAfterTerminate(t *testing.T) {
 	db := filledStateDB()
-	prefetcher := newTriePrefetcher(db.db, db.originalRoot, "", true)
+	prefetcher := newTriePrefetcher(db.db, db.originalRoot, &trie.ArenaNodeAllocator{}, "", true)
 	skey := common.HexToHash("aaa")
 
 	if err := prefetcher.prefetch(common.Hash{}, db.originalRoot, common.Address{}, nil, []common.Hash{skey}, false); err != nil {
@@ -87,7 +88,7 @@ func TestVerklePrefetcher(t *testing.T) {
 
 	state, _ = New(root, sdb)
 	sRoot := state.GetStorageRoot(addr)
-	fetcher := newTriePrefetcher(sdb, root, "", false)
+	fetcher := newTriePrefetcher(sdb, root, &trie.ArenaNodeAllocator{}, "", false)
 
 	// Read account
 	fetcher.prefetch(common.Hash{}, root, common.Address{}, []common.Address{addr}, nil, false)
