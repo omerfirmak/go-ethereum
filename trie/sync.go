@@ -425,7 +425,7 @@ func (s *Sync) ProcessNode(result NodeSyncResult) error {
 		return ErrAlreadyProcessed
 	}
 	// Decode the node data content and update the request
-	node, err := decodeNode(req.hash.Bytes(), result.Data)
+	node, err := decodeNode(req.hash.Bytes(), result.Data, GcNodeAllocator{})
 	if err != nil {
 		return err
 	}

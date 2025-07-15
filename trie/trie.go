@@ -57,6 +57,9 @@ type Trie struct {
 
 	// tracer is the tool to track the trie changes.
 	tracer *tracer
+
+	// allocator provides the allocation facilities for trie nodes
+	allocator NodeAllocator
 }
 
 // newFlag returns the cache flag value for a newly created node.
@@ -67,13 +70,14 @@ func (t *Trie) newFlag() nodeFlag {
 // Copy returns a copy of Trie.
 func (t *Trie) Copy() *Trie {
 	return &Trie{
-		root:        copyNode(t.root),
+		root:        copyNode(t.root, t.allocator),
 		owner:       t.owner,
 		committed:   t.committed,
 		unhashed:    t.unhashed,
 		uncommitted: t.uncommitted,
 		reader:      t.reader,
 		tracer:      t.tracer.copy(),
+		allocator:   t.allocator.Copy(),
 	}
 }
 
@@ -89,9 +93,10 @@ func New(id *ID, db database.NodeDatabase) (*Trie, error) {
 		return nil, err
 	}
 	trie := &Trie{
-		owner:  id.Owner,
-		reader: reader,
-		tracer: newTracer(),
+		owner:     id.Owner,
+		reader:    reader,
+		tracer:    newTracer(),
+		allocator: GcNodeAllocator{},
 	}
 	if id.Root != (common.Hash{}) && id.Root != types.EmptyRootHash {
 		rootnode, err := trie.resolveAndTrack(id.Root[:], nil)
@@ -341,10 +346,10 @@ func (t *Trie) insert(n node, prefix, key []byte, value node) (bool, node, error
 			if !dirty || err != nil {
 				return false, n, err
 			}
-			return true, &shortNode{n.Key, nn, t.newFlag()}, nil
+			return true, MakeShortNode(t.allocator, &shortNode{n.Key, nn, t.newFlag()}), nil
 		}
 		// Otherwise branch out at the index where they differ.
-		branch := &fullNode{flags: t.newFlag()}
+		branch := MakeFullNode(t.allocator, &fullNode{flags: t.newFlag()})
 		var err error
 		_, branch.Children[n.Key[matchlen]], err = t.insert(nil, append(prefix, n.Key[:matchlen+1]...), n.Key[matchlen+1:], n.Val)
 		if err != nil {
@@ -364,7 +369,7 @@ func (t *Trie) insert(n node, prefix, key []byte, value node) (bool, node, error
 		t.tracer.onInsert(append(prefix, key[:matchlen]...))
 
 		// Replace it with a short node leading up to the branch.
-		return true, &shortNode{key[:matchlen], branch, t.newFlag()}, nil
+		return true, MakeShortNode(t.allocator, &shortNode{key[:matchlen], branch, t.newFlag()}), nil
 
 	case *fullNode:
 		dirty, nn, err := t.insert(n.Children[key[0]], append(prefix, key[0]), key[1:], value)
@@ -381,7 +386,7 @@ func (t *Trie) insert(n node, prefix, key []byte, value node) (bool, node, error
 		// since it's always embedded in its parent.
 		t.tracer.onInsert(prefix)
 
-		return true, &shortNode{key, value, t.newFlag()}, nil
+		return true, MakeShortNode(t.allocator, &shortNode{key, value, t.newFlag()}), nil
 
 	case hashNode:
 		// We've hit a part of the trie that isn't loaded yet. Load
@@ -468,9 +473,9 @@ func (t *Trie) delete(n node, prefix, key []byte) (bool, node, error) {
 			// always creates a new slice) instead of append to
 			// avoid modifying n.Key since it might be shared with
 			// other nodes.
-			return true, &shortNode{concat(n.Key, child.Key...), child.Val, t.newFlag()}, nil
+			return true, MakeShortNode(t.allocator, &shortNode{concat(n.Key, child.Key...), child.Val, t.newFlag()}), nil
 		default:
-			return true, &shortNode{n.Key, child, t.newFlag()}, nil
+			return true, MakeShortNode(t.allocator, &shortNode{n.Key, child, t.newFlag()}), nil
 		}
 
 	case *fullNode:
@@ -528,12 +533,12 @@ func (t *Trie) delete(n node, prefix, key []byte) (bool, node, error) {
 					t.tracer.onDelete(append(prefix, byte(pos)))
 
 					k := append([]byte{byte(pos)}, cnode.Key...)
-					return true, &shortNode{k, cnode.Val, t.newFlag()}, nil
+					return true, MakeShortNode(t.allocator, &shortNode{k, cnode.Val, t.newFlag()}), nil
 				}
 			}
 			// Otherwise, n is replaced by a one-nibble short node
 			// containing the child.
-			return true, &shortNode{[]byte{byte(pos)}, n.Children[pos], t.newFlag()}, nil
+			return true, MakeShortNode(t.allocator, &shortNode{[]byte{byte(pos)}, n.Children[pos], t.newFlag()}), nil
 		}
 		// n still contains at least two values and cannot be reduced.
 		return true, n, nil
@@ -571,28 +576,28 @@ func concat(s1 []byte, s2 ...byte) []byte {
 }
 
 // copyNode deep-copies the supplied node along with its children recursively.
-func copyNode(n node) node {
+func copyNode(n node, allocator NodeAllocator) node {
 	switch n := (n).(type) {
 	case nil:
 		return nil
 	case valueNode:
-		return valueNode(common.CopyBytes(n))
+		return MakeValueNode(allocator, n)
 
 	case *shortNode:
-		return &shortNode{
+		return MakeShortNode(allocator, &shortNode{
 			flags: n.flags.copy(),
 			Key:   common.CopyBytes(n.Key),
-			Val:   copyNode(n.Val),
-		}
+			Val:   copyNode(n.Val, allocator),
+		})
 	case *fullNode:
 		var children [17]node
 		for i, cn := range n.Children {
-			children[i] = copyNode(cn)
+			children[i] = copyNode(cn, allocator)
 		}
-		return &fullNode{
+		return MakeFullNode(allocator, &fullNode{
 			flags:    n.flags.copy(),
 			Children: children,
-		}
+		})
 	case hashNode:
 		return n
 	default:
@@ -620,7 +625,7 @@ func (t *Trie) resolveAndTrack(n hashNode, prefix []byte) (node, error) {
 
 	// The returned node blob won't be changed afterward. No need to
 	// deep-copy the slice.
-	return decodeNodeUnsafe(n, blob)
+	return decodeNodeUnsafe(n, blob, t.allocator)
 }
 
 // Hash returns the root hash of the trie. It does not write to the
@@ -682,7 +687,7 @@ func (t *Trie) hashRoot() node {
 		return hashNode(types.EmptyRootHash.Bytes())
 	}
 	// If the number of changes is below 100, we let one thread handle it
-	h := newHasher(t.unhashed >= 100)
+	h := newHasher(t.unhashed >= 100, t.allocator)
 	defer func() {
 		returnHasherToPool(h)
 		t.unhashed = 0

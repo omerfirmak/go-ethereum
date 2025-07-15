@@ -126,8 +126,8 @@ func (n valueNode) fstring(ind string) string {
 }
 
 // mustDecodeNode is a wrapper of decodeNode and panic if any error is encountered.
-func mustDecodeNode(hash, buf []byte) node {
-	n, err := decodeNode(hash, buf)
+func mustDecodeNode(hash, buf []byte, allocator NodeAllocator) node {
+	n, err := decodeNode(hash, buf, allocator)
 	if err != nil {
 		panic(fmt.Sprintf("node %x: %v", hash, err))
 	}
@@ -136,8 +136,8 @@ func mustDecodeNode(hash, buf []byte) node {
 
 // mustDecodeNodeUnsafe is a wrapper of decodeNodeUnsafe and panic if any error is
 // encountered.
-func mustDecodeNodeUnsafe(hash, buf []byte) node {
-	n, err := decodeNodeUnsafe(hash, buf)
+func mustDecodeNodeUnsafe(hash, buf []byte, allocator NodeAllocator) node {
+	n, err := decodeNodeUnsafe(hash, buf, allocator)
 	if err != nil {
 		panic(fmt.Sprintf("node %x: %v", hash, err))
 	}
@@ -149,14 +149,14 @@ func mustDecodeNodeUnsafe(hash, buf []byte) node {
 // decode performance of this function is not optimal, but it is suitable for most
 // scenarios with low performance requirements and hard to determine whether the
 // byte slice be modified or not.
-func decodeNode(hash, buf []byte) (node, error) {
-	return decodeNodeUnsafe(hash, common.CopyBytes(buf))
+func decodeNode(hash, buf []byte, allocator NodeAllocator) (node, error) {
+	return decodeNodeUnsafe(hash, common.CopyBytes(buf), allocator)
 }
 
 // decodeNodeUnsafe parses the RLP encoding of a trie node. The passed byte slice
 // will be directly referenced by node without bytes deep copy, so the input MUST
 // not be changed after.
-func decodeNodeUnsafe(hash, buf []byte) (node, error) {
+func decodeNodeUnsafe(hash, buf []byte, allocator NodeAllocator) (node, error) {
 	if len(buf) == 0 {
 		return nil, io.ErrUnexpectedEOF
 	}
@@ -166,17 +166,17 @@ func decodeNodeUnsafe(hash, buf []byte) (node, error) {
 	}
 	switch c, _ := rlp.CountValues(elems); c {
 	case 2:
-		n, err := decodeShort(hash, elems)
+		n, err := decodeShort(hash, elems, allocator)
 		return n, wrapError(err, "short")
 	case 17:
-		n, err := decodeFull(hash, elems)
+		n, err := decodeFull(hash, elems, allocator)
 		return n, wrapError(err, "full")
 	default:
 		return nil, fmt.Errorf("invalid number of list elements: %v", c)
 	}
 }
 
-func decodeShort(hash, elems []byte) (node, error) {
+func decodeShort(hash, elems []byte, allocator NodeAllocator) (node, error) {
 	kbuf, rest, err := rlp.SplitString(elems)
 	if err != nil {
 		return nil, err
@@ -189,19 +189,19 @@ func decodeShort(hash, elems []byte) (node, error) {
 		if err != nil {
 			return nil, fmt.Errorf("invalid value node: %v", err)
 		}
-		return &shortNode{key, valueNode(val), flag}, nil
+		return MakeShortNode(allocator, &shortNode{key, valueNode(val), flag}), nil
 	}
-	r, _, err := decodeRef(rest)
+	r, _, err := decodeRef(rest, allocator)
 	if err != nil {
 		return nil, wrapError(err, "val")
 	}
-	return &shortNode{key, r, flag}, nil
+	return MakeShortNode(allocator, &shortNode{key, r, flag}), nil
 }
 
-func decodeFull(hash, elems []byte) (*fullNode, error) {
-	n := &fullNode{flags: nodeFlag{hash: hash}}
+func decodeFull(hash, elems []byte, allocator NodeAllocator) (*fullNode, error) {
+	n := MakeFullNode(allocator, &fullNode{flags: nodeFlag{hash: hash}})
 	for i := 0; i < 16; i++ {
-		cld, rest, err := decodeRef(elems)
+		cld, rest, err := decodeRef(elems, allocator)
 		if err != nil {
 			return n, wrapError(err, fmt.Sprintf("[%d]", i))
 		}
@@ -219,7 +219,7 @@ func decodeFull(hash, elems []byte) (*fullNode, error) {
 
 const hashLen = len(common.Hash{})
 
-func decodeRef(buf []byte) (node, []byte, error) {
+func decodeRef(buf []byte, alloctor NodeAllocator) (node, []byte, error) {
 	kind, val, rest, err := rlp.Split(buf)
 	if err != nil {
 		return nil, buf, err
@@ -234,7 +234,7 @@ func decodeRef(buf []byte) (node, []byte, error) {
 		}
 		// The buffer content has already been copied or is safe to use;
 		// no additional copy is required.
-		n, err := decodeNodeUnsafe(nil, buf)
+		n, err := decodeNodeUnsafe(nil, buf, alloctor)
 		return n, rest, err
 	case kind == rlp.String && len(val) == 0:
 		// empty node

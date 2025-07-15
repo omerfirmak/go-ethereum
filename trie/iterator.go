@@ -234,7 +234,7 @@ func (it *nodeIterator) LeafBlob() []byte {
 func (it *nodeIterator) LeafProof() [][]byte {
 	if len(it.stack) > 0 {
 		if _, ok := it.stack[len(it.stack)-1].node.(valueNode); ok {
-			hasher := newHasher(false)
+			hasher := newHasher(false, it.trie.allocator)
 			defer returnHasherToPool(hasher)
 			proofs := make([][]byte, 0, len(it.stack))
 
@@ -395,7 +395,7 @@ func (it *nodeIterator) peekSeek(seekKey []byte) (*nodeIteratorState, *int, []by
 func (it *nodeIterator) resolveHash(hash hashNode, path []byte) (node, error) {
 	if it.resolver != nil {
 		if blob := it.resolver(it.trie.owner, path, common.BytesToHash(hash)); len(blob) > 0 {
-			if resolved, err := decodeNode(hash, blob); err == nil {
+			if resolved, err := decodeNode(hash, blob, it.trie.allocator); err == nil {
 				return resolved, nil
 			}
 		}
@@ -412,7 +412,7 @@ func (it *nodeIterator) resolveHash(hash hashNode, path []byte) (node, error) {
 	// The raw-blob format nodes are loaded either from the
 	// clean cache or the database, they are all in their own
 	// copy and safe to use unsafe decoder.
-	return mustDecodeNodeUnsafe(hash, blob), nil
+	return mustDecodeNodeUnsafe(hash, blob, it.trie.allocator), nil
 }
 
 func (it *nodeIterator) resolveBlob(hash hashNode, path []byte) ([]byte, error) {

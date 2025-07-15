@@ -26,10 +26,11 @@ import (
 // hasher is a type used for the trie Hash operation. A hasher has some
 // internal preallocated temp space
 type hasher struct {
-	sha      crypto.KeccakState
-	tmp      []byte
-	encbuf   rlp.EncoderBuffer
-	parallel bool // Whether to use parallel threads when hashing
+	sha       crypto.KeccakState
+	tmp       []byte
+	encbuf    rlp.EncoderBuffer
+	parallel  bool // Whether to use parallel threads when hashing
+	allocator NodeAllocator
 }
 
 // hasherPool holds pureHashers
@@ -43,13 +44,15 @@ var hasherPool = sync.Pool{
 	},
 }
 
-func newHasher(parallel bool) *hasher {
+func newHasher(parallel bool, allocator NodeAllocator) *hasher {
 	h := hasherPool.Get().(*hasher)
 	h.parallel = parallel
+	h.allocator = allocator
 	return h
 }
 
 func returnHasherToPool(h *hasher) {
+	h.allocator = nil
 	hasherPool.Put(h)
 }
 
@@ -88,7 +91,8 @@ func (h *hasher) hash(n node, force bool) node {
 // hashShortNodeChildren returns a copy of the supplied shortNode, with its child
 // being replaced by either the hash or an embedded node if the child is small.
 func (h *hasher) hashShortNodeChildren(n *shortNode) *shortNode {
-	var collapsed shortNode
+	collapsed := h.allocator.NewShort()
+	collapsed.flags = nodeFlag{}
 	collapsed.Key = hexToCompact(n.Key)
 	switch n.Val.(type) {
 	case *fullNode, *shortNode:
@@ -96,7 +100,7 @@ func (h *hasher) hashShortNodeChildren(n *shortNode) *shortNode {
 	default:
 		collapsed.Val = n.Val
 	}
-	return &collapsed
+	return collapsed
 }
 
 // hashFullNodeChildren returns a copy of the supplied fullNode, with its child
@@ -108,7 +112,7 @@ func (h *hasher) hashFullNodeChildren(n *fullNode) *fullNode {
 		wg.Add(16)
 		for i := 0; i < 16; i++ {
 			go func(i int) {
-				hasher := newHasher(false)
+				hasher := newHasher(false, h.allocator.Copy())
 				if child := n.Children[i]; child != nil {
 					children[i] = hasher.hash(child, false)
 				} else {
@@ -131,7 +135,7 @@ func (h *hasher) hashFullNodeChildren(n *fullNode) *fullNode {
 	if n.Children[16] != nil {
 		children[16] = n.Children[16]
 	}
-	return &fullNode{flags: nodeFlag{}, Children: children}
+	return MakeFullNode(h.allocator, &fullNode{flags: nodeFlag{}, Children: children})
 }
 
 // shortNodeToHash computes the hash of the given shortNode. The shortNode must
@@ -177,7 +181,7 @@ func (h *hasher) encodedBytes() []byte {
 
 // hashData hashes the provided data
 func (h *hasher) hashData(data []byte) hashNode {
-	n := make(hashNode, 32)
+	n := h.allocator.NewBytes(32)
 	h.sha.Reset()
 	h.sha.Write(data)
 	h.sha.Read(n)

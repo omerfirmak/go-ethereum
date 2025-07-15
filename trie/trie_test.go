@@ -1213,7 +1213,7 @@ func TestDecodeNode(t *testing.T) {
 	for i := 0; i < 5000000; i++ {
 		prng.Read(hash)
 		prng.Read(elems)
-		decodeNode(hash, elems)
+		decodeNode(hash, elems, GcNodeAllocator{})
 	}
 }
 

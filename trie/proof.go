@@ -76,12 +76,12 @@ func (t *Trie) Prove(key []byte, proofDb ethdb.KeyValueWriter) error {
 			// The raw-blob format nodes are loaded either from the
 			// clean cache or the database, they are all in their own
 			// copy and safe to use unsafe decoder.
-			tn = mustDecodeNodeUnsafe(n, blob)
+			tn = mustDecodeNodeUnsafe(n, blob, t.allocator)
 		default:
 			panic(fmt.Sprintf("%T: invalid node: %v", tn, tn))
 		}
 	}
-	hasher := newHasher(false)
+	hasher := newHasher(false, t.allocator)
 	defer returnHasherToPool(hasher)
 
 	for i, n := range nodes {
@@ -122,7 +122,7 @@ func VerifyProof(rootHash common.Hash, key []byte, proofDb ethdb.KeyValueReader)
 		if buf == nil {
 			return nil, fmt.Errorf("proof node %d (hash %064x) missing", i, wantHash)
 		}
-		n, err := decodeNode(wantHash[:], buf)
+		n, err := decodeNode(wantHash[:], buf, GcNodeAllocator{})
 		if err != nil {
 			return nil, fmt.Errorf("bad proof node %d: %v", i, err)
 		}
@@ -152,7 +152,7 @@ func proofToPath(rootHash common.Hash, root node, key []byte, proofDb ethdb.KeyV
 		if buf == nil {
 			return nil, fmt.Errorf("proof node (hash %064x) missing", hash)
 		}
-		n, err := decodeNode(hash[:], buf)
+		n, err := decodeNode(hash[:], buf, GcNodeAllocator{})
 		if err != nil {
 			return nil, fmt.Errorf("bad proof node %v", err)
 		}
@@ -573,7 +573,7 @@ func VerifyRangeProof(rootHash common.Hash, firstKey []byte, keys [][]byte, valu
 	}
 	// Rebuild the trie with the leaf stream, the shape of trie
 	// should be same with the original one.
-	tr := &Trie{root: root, reader: newEmptyReader(), tracer: newTracer()}
+	tr := &Trie{root: root, reader: newEmptyReader(), tracer: newTracer(), allocator: GcNodeAllocator{}}
 	if empty {
 		tr.root = nil
 	}

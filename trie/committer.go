@@ -165,7 +165,7 @@ func (c *committer) store(path []byte, n node) node {
 
 // ForGatherChildren decodes the provided node and traverses the children inside.
 func ForGatherChildren(node []byte, onChild func(common.Hash)) {
-	forGatherChildren(mustDecodeNodeUnsafe(nil, node), onChild)
+	forGatherChildren(mustDecodeNodeUnsafe(nil, node, GcNodeAllocator{}), onChild)
 }
 
 // forGatherChildren traverses the node hierarchy and invokes the callback

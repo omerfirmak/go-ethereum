@@ -47,7 +47,7 @@ func TestDecodeNestedNode(t *testing.T) {
 	buf := bytes.NewBuffer([]byte{})
 	rlp.Encode(buf, fullNodeData)
 
-	if _, err := decodeNode([]byte("testdecode"), buf.Bytes()); err != nil {
+	if _, err := decodeNode([]byte("testdecode"), buf.Bytes(), GcNodeAllocator{}); err != nil {
 		t.Fatalf("decode nested full node err: %v", err)
 	}
 }
@@ -58,7 +58,7 @@ func TestDecodeFullNodeWrongSizeChild(t *testing.T) {
 	buf := bytes.NewBuffer([]byte{})
 	rlp.Encode(buf, fullNodeData)
 
-	_, err := decodeNode([]byte("testdecode"), buf.Bytes())
+	_, err := decodeNode([]byte("testdecode"), buf.Bytes(), GcNodeAllocator{})
 	if _, ok := err.(*decodeError); !ok {
 		t.Fatalf("decodeNode returned wrong err: %v", err)
 	}
@@ -77,7 +77,7 @@ func TestDecodeFullNodeWrongNestedFullNode(t *testing.T) {
 	buf := bytes.NewBuffer([]byte{})
 	rlp.Encode(buf, fullNodeData)
 
-	_, err := decodeNode([]byte("testdecode"), buf.Bytes())
+	_, err := decodeNode([]byte("testdecode"), buf.Bytes(), GcNodeAllocator{})
 	if _, ok := err.(*decodeError); !ok {
 		t.Fatalf("decodeNode returned wrong err: %v", err)
 	}
@@ -88,7 +88,7 @@ func TestDecodeFullNode(t *testing.T) {
 	buf := bytes.NewBuffer([]byte{})
 	rlp.Encode(buf, fullNodeData)
 
-	_, err := decodeNode([]byte("testdecode"), buf.Bytes())
+	_, err := decodeNode([]byte("testdecode"), buf.Bytes(), GcNodeAllocator{})
 	if err != nil {
 		t.Fatalf("decode full node err: %v", err)
 	}
@@ -147,7 +147,7 @@ func BenchmarkDecodeShortNode(b *testing.B) {
 	b.ReportAllocs()
 
 	for i := 0; i < b.N; i++ {
-		mustDecodeNode(hash, blob)
+		mustDecodeNode(hash, blob, GcNodeAllocator{})
 	}
 }
 
@@ -168,7 +168,7 @@ func BenchmarkDecodeShortNodeUnsafe(b *testing.B) {
 	b.ReportAllocs()
 
 	for i := 0; i < b.N; i++ {
-		mustDecodeNodeUnsafe(hash, blob)
+		mustDecodeNodeUnsafe(hash, blob, GcNodeAllocator{})
 	}
 }
 
@@ -189,7 +189,7 @@ func BenchmarkDecodeFullNode(b *testing.B) {
 	b.ReportAllocs()
 
 	for i := 0; i < b.N; i++ {
-		mustDecodeNode(hash, blob)
+		mustDecodeNode(hash, blob, GcNodeAllocator{})
 	}
 }
 
@@ -210,6 +210,6 @@ func BenchmarkDecodeFullNodeUnsafe(b *testing.B) {
 	b.ReportAllocs()
 
 	for i := 0; i < b.N; i++ {
-		mustDecodeNodeUnsafe(hash, blob)
+		mustDecodeNodeUnsafe(hash, blob, GcNodeAllocator{})
 	}
 }
