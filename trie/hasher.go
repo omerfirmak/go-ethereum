@@ -108,19 +108,19 @@ func (h *hasher) hashFullNodeChildren(n *fullNode) *fullNode {
 	fullNode := fullNode{flags: nodeFlag{}}
 	if h.parallel {
 		var wg sync.WaitGroup
-		wg.Add(16)
 		for i := 0; i < 16; i++ {
-			go func(i int) {
-				hasherWorkers.Mark(1)
-				hasher := newHasher(false)
-				if child := n.Children[i]; child != nil {
+			if child := n.Children[i]; child != nil {
+				wg.Add(1)
+				go func(i int) {
+					hasherWorkers.Mark(1)
+					hasher := newHasher(false)
 					fullNode.Children[i] = hasher.hash(child, false)
-				} else {
-					fullNode.Children[i] = nilValueNode
-				}
-				returnHasherToPool(hasher)
-				wg.Done()
-			}(i)
+					returnHasherToPool(hasher)
+					wg.Done()
+				}(i)
+			} else {
+				fullNode.Children[i] = nilValueNode
+			}
 		}
 		wg.Wait()
 	} else {
