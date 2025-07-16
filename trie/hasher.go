@@ -20,8 +20,11 @@ import (
 	"sync"
 
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/metrics"
 	"github.com/ethereum/go-ethereum/rlp"
 )
+
+var hasherWorkers = metrics.NewRegisteredMeter("trie/hasher/activeworkers", nil)
 
 // hasher is a type used for the trie Hash operation. A hasher has some
 // internal preallocated temp space
@@ -108,6 +111,7 @@ func (h *hasher) hashFullNodeChildren(n *fullNode) *fullNode {
 		wg.Add(16)
 		for i := 0; i < 16; i++ {
 			go func(i int) {
+				hasherWorkers.Mark(1)
 				hasher := newHasher(false)
 				if child := n.Children[i]; child != nil {
 					fullNode.Children[i] = hasher.hash(child, false)
