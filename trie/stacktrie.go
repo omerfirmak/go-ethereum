@@ -18,7 +18,9 @@ package trie
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
+	"os"
 	"sync"
 	"unsafe"
 
@@ -80,6 +82,12 @@ type StackTrie struct {
 	kBuf    []byte  // buf space used for hex-key during insertions
 	pBuf    []byte  // buf space used for path during insertions
 	tmpNode *stNode // used as a temporary ext node when needed
+
+	hashed []int
+	reset  []int
+	keys   [][]byte
+	values [][]byte
+	prev   [4]*stNode
 }
 
 // NewStackTrie allocates and initializes an empty trie. The committed nodes
@@ -129,6 +137,8 @@ func (t *StackTrie) Update(key, value []byte) error {
 	if len(value) == 0 {
 		return errors.New("trying to insert empty (deletion)")
 	}
+	t.keys = append(t.keys, append([]byte{}, key...))
+	t.values = append(t.values, append([]byte{}, value...))
 	t.grow(key)
 	k := writeHexKey(t.kBuf, key)
 	if bytes.Compare(t.last, k) >= 0 {
@@ -145,6 +155,8 @@ func (t *StackTrie) Update(key, value []byte) error {
 
 // Reset resets the stack trie object to empty state.
 func (t *StackTrie) Reset() {
+	t.reset = append(t.reset, len(t.keys))
+	t.prev = [4]*stNode{}
 	t.nodeAllocator.Reset(0)
 	t.byteAllocator.Reset(0)
 	t.root = t.nodeAllocator.Alloc().reset()
@@ -388,6 +400,22 @@ func (t *StackTrie) insert(st *stNode, key, value []byte, path []byte) {
 //
 // This method also sets 'st.type' to hashedNode, and clears 'st.key'.
 func (t *StackTrie) hash(st *stNode, path []byte) {
+	if t.prev[0] == t.prev[1] && t.prev[1] == t.prev[2] && t.prev[2] == t.prev[3] && t.prev[3] != nil {
+		type dump struct {
+			Resets []int
+			Hashed []int
+			Keys   [][]byte
+			Values [][]byte
+		}
+		json.NewEncoder(os.Stderr).Encode(dump{
+			Resets: t.reset,
+			Hashed: t.hashed,
+			Keys:   t.keys,
+			Values: t.values,
+		})
+		panic("looping")
+	}
+	t.prev[3], t.prev[2], t.prev[1], t.prev[0] = t.prev[2], t.prev[1], t.prev[0], st
 	var blob []byte // RLP-encoded node blob
 	switch st.typ {
 	case hashedNode:
@@ -474,8 +502,10 @@ func (t *StackTrie) hash(st *stNode, path []byte) {
 // have been committed already. The main purpose here is to commit the nodes on
 // right boundary.
 func (t *StackTrie) Hash() common.Hash {
+	t.hashed = append(t.hashed, len(t.keys))
 	n := t.root
 	t.hash(n, nil)
+	t.prev = [4]*stNode{}
 	hash := common.BytesToHash(n.val)
 	t.byteAllocator.Release()
 	t.nodeAllocator.Release()
