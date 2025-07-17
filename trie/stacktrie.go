@@ -160,6 +160,7 @@ func (t *StackTrie) Reset() {
 	t.nodeAllocator.Reset(0)
 	t.byteAllocator.Reset(0)
 	t.root = t.nodeAllocator.Alloc().reset()
+	t.tmpNode = t.nodeAllocator.Alloc().reset()
 	t.last = nil
 }
 
