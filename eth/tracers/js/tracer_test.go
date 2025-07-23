@@ -184,7 +184,7 @@ func TestHaltBetweenSteps(t *testing.T) {
 	}
 	contract := vm.NewContract(common.Address{}, common.Address{}, uint256.NewInt(0), 0, nil)
 	scope := &vm.ScopeContext{
-		Contract: &contract,
+		Contract: contract,
 	}
 	evm := vm.NewEVM(vm.BlockContext{BlockNumber: big.NewInt(1)}, &dummyStatedb{}, chainConfig, vm.Config{Tracer: tracer.Hooks})
 	evm.SetTxContext(vm.TxContext{GasPrice: big.NewInt(1)})
@@ -283,7 +283,7 @@ func TestEnterExit(t *testing.T) {
 	}
 	contract := vm.NewContract(common.Address{}, common.Address{}, uint256.NewInt(0), 0, nil)
 	scope := &vm.ScopeContext{
-		Contract: &contract,
+		Contract: contract,
 	}
 	tracer.OnEnter(1, byte(vm.CALL), scope.Contract.Caller(), scope.Contract.Address(), []byte{}, 1000, new(big.Int))
 	tracer.OnExit(1, []byte{}, 400, nil, false)
