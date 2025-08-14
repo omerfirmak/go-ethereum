@@ -304,12 +304,32 @@ func (t *Trie) Update(key, value []byte) error {
 	return t.update(key, value)
 }
 
+// UpdateInPlace allows modifying the existing value associated with the key
+// without fetching it first by calling Get
+func (t *Trie) UpdateInPlace(key []byte, updater func([]byte) []byte) error {
+	// Short circuit if the trie is already committed and not usable.
+	if t.committed {
+		return ErrCommitted
+	}
+	k := keybytesToHex(key)
+	_, n, err := t.insert(t.root, nil, k, func(n node) node {
+		return valueNode(updater(n.(valueNode)))
+	})
+	if err != nil {
+		return err
+	}
+	t.root = n
+	return nil
+}
+
 func (t *Trie) update(key, value []byte) error {
 	t.unhashed++
 	t.uncommitted++
 	k := keybytesToHex(key)
 	if len(value) != 0 {
-		_, n, err := t.insert(t.root, nil, k, valueNode(value))
+		_, n, err := t.insert(t.root, nil, k, func(node) node {
+			return valueNode(value)
+		})
 		if err != nil {
 			return err
 		}
@@ -324,12 +344,13 @@ func (t *Trie) update(key, value []byte) error {
 	return nil
 }
 
-func (t *Trie) insert(n node, prefix, key []byte, value node) (bool, node, error) {
+func (t *Trie) insert(n node, prefix, key []byte, updater func(node) node) (bool, node, error) {
 	if len(key) == 0 {
 		if v, ok := n.(valueNode); ok {
-			return !bytes.Equal(v, value.(valueNode)), value, nil
+			newValue := updater(v)
+			return !bytes.Equal(v, newValue.(valueNode)), newValue, nil
 		}
-		return true, value, nil
+		return true, updater(n), nil
 	}
 	switch n := n.(type) {
 	case *shortNode:
@@ -337,7 +358,7 @@ func (t *Trie) insert(n node, prefix, key []byte, value node) (bool, node, error
 		// If the whole key matches, keep this short node as is
 		// and only update the value.
 		if matchlen == len(n.Key) {
-			dirty, nn, err := t.insert(n.Val, append(prefix, key[:matchlen]...), key[matchlen:], value)
+			dirty, nn, err := t.insert(n.Val, append(prefix, key[:matchlen]...), key[matchlen:], updater)
 			if !dirty || err != nil {
 				return false, n, err
 			}
@@ -346,11 +367,13 @@ func (t *Trie) insert(n node, prefix, key []byte, value node) (bool, node, error
 		// Otherwise branch out at the index where they differ.
 		branch := &fullNode{flags: t.newFlag()}
 		var err error
-		_, branch.Children[n.Key[matchlen]], err = t.insert(nil, append(prefix, n.Key[:matchlen+1]...), n.Key[matchlen+1:], n.Val)
+		_, branch.Children[n.Key[matchlen]], err = t.insert(nil, append(prefix, n.Key[:matchlen+1]...), n.Key[matchlen+1:], func(node) node {
+			return n.Val
+		})
 		if err != nil {
 			return false, nil, err
 		}
-		_, branch.Children[key[matchlen]], err = t.insert(nil, append(prefix, key[:matchlen+1]...), key[matchlen+1:], value)
+		_, branch.Children[key[matchlen]], err = t.insert(nil, append(prefix, key[:matchlen+1]...), key[matchlen+1:], updater)
 		if err != nil {
 			return false, nil, err
 		}
@@ -367,7 +390,7 @@ func (t *Trie) insert(n node, prefix, key []byte, value node) (bool, node, error
 		return true, &shortNode{key[:matchlen], branch, t.newFlag()}, nil
 
 	case *fullNode:
-		dirty, nn, err := t.insert(n.Children[key[0]], append(prefix, key[0]), key[1:], value)
+		dirty, nn, err := t.insert(n.Children[key[0]], append(prefix, key[0]), key[1:], updater)
 		if !dirty || err != nil {
 			return false, n, err
 		}
@@ -381,7 +404,7 @@ func (t *Trie) insert(n node, prefix, key []byte, value node) (bool, node, error
 		// since it's always embedded in its parent.
 		t.tracer.onInsert(prefix)
 
-		return true, &shortNode{key, value, t.newFlag()}, nil
+		return true, &shortNode{key, updater(nil), t.newFlag()}, nil
 
 	case hashNode:
 		// We've hit a part of the trie that isn't loaded yet. Load
@@ -391,7 +414,7 @@ func (t *Trie) insert(n node, prefix, key []byte, value node) (bool, node, error
 		if err != nil {
 			return false, nil, err
 		}
-		dirty, nn, err := t.insert(rn, prefix, key, value)
+		dirty, nn, err := t.insert(rn, prefix, key, updater)
 		if !dirty || err != nil {
 			return false, rn, err
 		}

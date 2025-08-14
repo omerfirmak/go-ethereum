@@ -206,6 +206,32 @@ func (t *StateTrie) UpdateAccount(address common.Address, acc *types.StateAccoun
 	return nil
 }
 
+// UpdateAccountInPlace allows modifying a account state without fetching it first by calling Get.
+func (t *StateTrie) UpdateAccountInPlace(address common.Address, updater func(*types.StateAccount, *int)) error {
+	hk := crypto.Keccak256(address.Bytes())
+	if err := t.trie.UpdateInPlace(hk, func(b []byte) []byte {
+		acc := types.NewEmptyStateAccount()
+		if b != nil {
+			err := rlp.DecodeBytes(b, acc)
+			if err != nil {
+				panic("trie served garbage account rlp")
+			}
+		}
+		updater(acc, nil)
+		b, err := rlp.EncodeToBytes(acc)
+		if err != nil {
+			panic("failed to encode updated account RLP")
+		}
+		return b
+	}); err != nil {
+		return err
+	}
+	if t.preimages != nil {
+		t.secKeyCache[common.Hash(hk)] = address.Bytes()
+	}
+	return nil
+}
+
 func (t *StateTrie) UpdateContractCode(_ common.Address, _ common.Hash, _ []byte) error {
 	return nil
 }

@@ -28,6 +28,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/trie/trienode"
+	"github.com/stretchr/testify/require"
 )
 
 func newEmptySecure() *StateTrie {
@@ -146,4 +147,23 @@ func TestStateTrieConcurrency(t *testing.T) {
 	}
 	// Wait for all threads to finish
 	pend.Wait()
+}
+
+func TestUpdateAccountInPlace(t *testing.T) {
+	trie := newEmptySecure()
+	var addr common.Address
+	addr.SetBytes([]byte{0, 1, 2})
+	account := types.NewEmptyStateAccount()
+	account.Nonce = 44
+	account.Balance.AddUint64(account.Balance, 1337)
+
+	require.NoError(t, trie.UpdateAccount(addr, account, 0))
+	require.NoError(t, trie.UpdateAccountInPlace(addr, func(sa *types.StateAccount, i *int) {
+		sa.Nonce = 37
+	}))
+
+	gotAcc, err := trie.GetAccount(addr)
+	require.NoError(t, err)
+	account.Nonce = 37
+	require.Equal(t, account, gotAcc)
 }

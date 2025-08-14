@@ -156,6 +156,11 @@ func (t *VerkleTrie) UpdateAccount(addr common.Address, acc *types.StateAccount,
 	return nil
 }
 
+// UpdateAccountInPlace allows modifying a account state without fetching it first by calling Get.
+func (t *VerkleTrie) UpdateAccountInPlace(address common.Address, updater func(*types.StateAccount, *int)) error {
+	panic("not implemented")
+}
+
 // UpdateStorage implements state.Trie, writing the provided storage slot into
 // the tree. If the tree is corrupted, an error will be returned.
 func (t *VerkleTrie) UpdateStorage(address common.Address, key, value []byte) error {

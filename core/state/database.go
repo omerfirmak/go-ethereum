@@ -90,6 +90,10 @@ type Trie interface {
 	// in the trie with provided address.
 	UpdateAccount(address common.Address, account *types.StateAccount, codeLen int) error
 
+	// UpdateAccountInPlace allows modifying a account state in-place, without fetching it
+	// first
+	UpdateAccountInPlace(address common.Address, updater func(*types.StateAccount, *int)) error
+
 	// UpdateStorage associates key with value in the trie. If value has length zero,
 	// any existing value is deleted from the trie. The value bytes must not be modified
 	// by the caller while they are stored in the trie. If a node was not found in the
