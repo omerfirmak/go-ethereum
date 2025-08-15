@@ -1110,37 +1110,116 @@ func (s *StateDB) ApplyPrestate(prestateDiff *bal.StateDiff) {
 	}
 }
 
-// ApplyStateDiff applies a state diff to the StateDB.  All state changes will be marked as mutations
-// for the purpose of applying them in the next call to Commit.
-func (s *StateDB) ApplyStateDiff(diff *bal.StateDiff) {
+// PrepStateDiff applies a state diff to the StateDB.
+func (s *StateDB) PrepStateDiff(diff *bal.StateDiff) (*stateUpdate, error) {
+	if len(s.stateObjects) > 0 {
+		panic("Applying state diff on a dirty state")
+	}
+	update := stateUpdate{originRoot: s.originalRoot}
+
+	type storageRes struct {
+		account common.Address
+		root    common.Hash
+		nodes   *trienode.NodeSet
+		writes  map[common.Hash][]byte
+		err     error
+	}
+	storageResCh := make(chan storageRes)
+	// Start storage updates in the background
+	storageUpdateCount := 0
 	for addr, accountDiff := range diff.Mutations {
-		stateObject, ok := s.stateObjects[addr]
-		if !ok {
-			stateObject = newObject(s, addr, &types.StateAccount{
-				0,
-				uint256.NewInt(0),
-				types.EmptyRootHash,
-				types.EmptyCodeHash[:],
-			})
-		}
-		if accountDiff.Code != nil {
-			stateObject.SetCode(crypto.Keccak256Hash(accountDiff.Code), accountDiff.Code)
-		}
 		if accountDiff.StorageWrites != nil {
-			for slot, value := range accountDiff.StorageWrites {
-				stateObject.SetState(slot, value)
-			}
-		}
-		if accountDiff.Nonce != nil {
-			stateObject.SetNonce(*accountDiff.Nonce)
-		}
-		if accountDiff.Balance != nil {
-			stateObject.SetBalance(new(uint256.Int).SetBytes((*accountDiff.Balance)[:]))
-		}
-		if !stateObject.empty() {
-			s.setStateObject(stateObject)
+			go func(addr common.Address, writes map[common.Hash]common.Hash) {
+				defer func() {
+					if p := recover(); p != nil {
+						storageResCh <- storageRes{account: addr, err: fmt.Errorf("panic: %s", p)}
+					}
+				}()
+				var storageRoot common.Hash
+				// Path based db doesn't need the root to open a storage trie
+				if s.db.TrieDB().Scheme() == rawdb.HashScheme {
+					storageRoot = s.GetStorageRoot(addr)
+				}
+				sTrie, err := s.db.OpenStorageTrie(s.originalRoot, addr, storageRoot, s.trie)
+				if err != nil {
+					storageResCh <- storageRes{account: addr, err: err}
+					return
+				}
+
+				writeRes := make(map[common.Hash][]byte, len(writes))
+				for location, value := range writes {
+					writeRes[location] = value[:]
+					err = sTrie.UpdateStorage(addr, location[:], value[:])
+					if err != nil {
+						storageResCh <- storageRes{account: addr, err: err}
+						return
+					}
+				}
+				newStorageRoot, nodes := sTrie.Commit(false)
+				storageResCh <- storageRes{account: addr, root: newStorageRoot, nodes: nodes, writes: writeRes}
+			}(addr, accountDiff.StorageWrites)
+			storageUpdateCount++
 		}
 	}
+
+	updateAccount := func(addr common.Address, diff *bal.AccountState, storageRes *storageRes) func(*types.StateAccount, *int) {
+		return func(sa *types.StateAccount, codeLen *int) {
+			update.accountsOrigin[addr] = types.SlimAccountRLP(*sa)
+
+			if diff.Nonce != nil {
+				sa.Nonce = *diff.Nonce
+			}
+			if diff.Balance != nil {
+				sa.Balance = new(uint256.Int).SetBytes(diff.Balance[:])
+			}
+			if diff.Code != nil {
+				if codeLen != nil {
+					*codeLen = len(diff.Code)
+				}
+				codeHash := crypto.Keccak256Hash(diff.Code)
+				sa.CodeHash = codeHash[:]
+				update.codes[addr] = contractCode{codeHash, diff.Code}
+			}
+
+			addrHash := crypto.Keccak256Hash(addr[:])
+			if diff.StorageWrites != nil {
+				sa.Root = storageRes.root
+				update.nodes.Merge(storageRes.nodes)
+				update.storages[addrHash] = storageRes.writes
+			}
+			update.accounts[addrHash] = types.SlimAccountRLP(*sa)
+		}
+	}
+
+	for addr, accountDiff := range diff.Mutations {
+		if accountDiff.StorageWrites != nil {
+			continue
+		}
+
+		err := s.trie.UpdateAccountInPlace(addr, updateAccount(addr, accountDiff, nil))
+		if err != nil {
+			return nil, fmt.Errorf("failed to update account %s, reason: %s", addr, err)
+		}
+	}
+
+	for range storageUpdateCount {
+		storageRes := <-storageResCh
+		if storageRes.err != nil {
+			// todo: handle go routine leak at early return
+			return nil, fmt.Errorf("failed to calculate storage for %s, reason: %s", storageRes.account, storageRes.err)
+		}
+		accountDiff := diff.Mutations[storageRes.account]
+		err := s.trie.UpdateAccountInPlace(storageRes.account, updateAccount(storageRes.account, accountDiff, &storageRes))
+		if err != nil {
+			// todo: handle go routine leak at early return
+			return nil, fmt.Errorf("failed to update account %s, reason: %s", storageRes.account, err)
+		}
+	}
+
+	stateRoot, nodes := s.trie.Commit(true)
+	update.nodes.Merge(nodes)
+	update.root = stateRoot
+	return &update, nil
 }
 
 func (s *StateDB) clearJournalAndRefund() {
