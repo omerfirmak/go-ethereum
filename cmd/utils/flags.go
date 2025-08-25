@@ -565,6 +565,16 @@ var (
 		Value:    "{}",
 		Category: flags.VMCategory,
 	}
+	VMWitnessStatsFlag = &cli.BoolFlag{
+		Name:     "vmwitnessstats",
+		Usage:    "Enable collection of witness trie access statistics",
+		Category: flags.VMCategory,
+	}
+	VMStatelessSelfValidationFlag = &cli.BoolFlag{
+		Name:     "stateless-self-validation",
+		Usage:    "Generate execution witnesses and self-check against them (testing purpose)",
+		Category: flags.VMCategory,
+	}
 	// API options.
 	RPCGlobalGasCapFlag = &cli.Uint64Flag{
 		Name:     "rpc.gascap",
@@ -1701,6 +1711,12 @@ func SetEthConfig(ctx *cli.Context, stack *node.Node, cfg *ethconfig.Config) {
 	if ctx.IsSet(VMEnableDebugFlag.Name) {
 		cfg.EnablePreimageRecording = ctx.Bool(VMEnableDebugFlag.Name)
 	}
+	if ctx.IsSet(VMWitnessStatsFlag.Name) {
+		cfg.EnableWitnessStats = ctx.Bool(VMWitnessStatsFlag.Name)
+	}
+	if ctx.IsSet(VMStatelessSelfValidationFlag.Name) {
+		cfg.StatelessSelfValidation = ctx.Bool(VMStatelessSelfValidationFlag.Name)
+	}
 
 	if ctx.IsSet(RPCGlobalGasCapFlag.Name) {
 		cfg.RPCGasCap = ctx.Uint64(RPCGlobalGasCapFlag.Name)
@@ -2231,6 +2247,8 @@ func MakeChain(ctx *cli.Context, stack *node.Node, readonly bool) (*core.BlockCh
 	}
 	vmcfg := vm.Config{
 		EnablePreimageRecording: ctx.Bool(VMEnableDebugFlag.Name),
+		EnableWitnessStats:      ctx.Bool(VMWitnessStatsFlag.Name),
+		StatelessSelfValidation: ctx.Bool(VMStatelessSelfValidationFlag.Name),
 	}
 	if ctx.IsSet(VMTraceFlag.Name) {
 		if name := ctx.String(VMTraceFlag.Name); name != "" {
